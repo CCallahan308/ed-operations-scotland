@@ -1,0 +1,47 @@
+{
+  "persistence": {
+    "n": 510,
+    "mae": 2.8479,
+    "rmse": 3.8885,
+    "directional_accuracy": 0.1373,
+    "median_abs_error": 2.06,
+    "p90_abs_error": 6.003,
+    "mean_error": -0.1645,
+    "per_site_mae_median": 2.6118,
+    "per_site_mae_iqr": 1.4651
+  },
+  "seasonal_naive": {
+    "n": 510,
+    "mae": 3.8444,
+    "rmse": 5.0127,
+    "directional_accuracy": 0.5255,
+    "median_abs_error": 3.035,
+    "p90_abs_error": 7.949,
+    "mean_error": 1.2176,
+    "per_site_mae_median": 3.5194,
+    "per_site_mae_iqr": 1.2103
+  },
+  "site_historical_mean": {
+    "n": 510,
+    "mae": 19.258,
+    "rmse": 22.2016,
+    "directional_accuracy": 0.451,
+    "median_abs_error": 20.131,
+    "p90_abs_error": 34.1254,
+    "mean_error": 19.2448,
+    "per_site_mae_median": 21.3491,
+    "per_site_mae_iqr": 19.1164
+  },
+  "_meta": {
+    "partition": "validation",
+    "window": [
+      202401,
+      202505
+    ],
+    "bar_to_beat": {
+      "model": "persistence",
+      "mae": 2.8479
+    },
+    "note": "Corrected: target_col=target_compliance (was compliance_pct); seasonal naive lag-11 (was lag-12)."
+  }
+}

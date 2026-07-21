@@ -1,0 +1,75 @@
+{
+  "config": {
+    "model_family": "HistGradientBoostingRegressor + persistence ensemble",
+    "max_depth": 5,
+    "learning_rate": 0.03,
+    "max_iter": 500,
+    "l2_regularization": 1.0,
+    "min_samples_leaf": 40,
+    "ensemble_weight_ca": 0.4,
+    "feature_builder_params": {
+      "compliance_lags": [
+        1,
+        2,
+        3,
+        6,
+        11,
+        12
+      ],
+      "compliance_roll_windows": [
+        3,
+        6,
+        12
+      ],
+      "attendance_lags": [
+        1,
+        2,
+        12
+      ]
+    },
+    "random_seed": 20260721,
+    "train_window": [
+      201801,
+      202312
+    ],
+    "validation_window": [
+      202401,
+      202505
+    ]
+  },
+  "feature_columns": [
+    "f_compliance_lag1",
+    "f_compliance_lag2",
+    "f_compliance_lag3",
+    "f_compliance_lag6",
+    "f_compliance_lag11",
+    "f_compliance_lag12",
+    "f_compliance_roll3_mean",
+    "f_compliance_roll3_std",
+    "f_compliance_roll6_mean",
+    "f_compliance_roll6_std",
+    "f_compliance_roll12_mean",
+    "f_compliance_roll12_std",
+    "f_attendance_lag1",
+    "f_attendance_lag2",
+    "f_attendance_lag12",
+    "f_attendance_yoy_pct",
+    "f_year",
+    "f_month_of_year",
+    "f_quarter",
+    "f_months_since_site_start",
+    "f_recent_slope_3m"
+  ],
+  "val_metrics": {
+    "n": 510,
+    "mae": 2.5091,
+    "rmse": 3.4393,
+    "directional_accuracy": 0.4824,
+    "median_abs_error": 1.9534,
+    "p90_abs_error": 5.5897,
+    "mean_error": 0.1445,
+    "per_site_mae_median": 2.2906,
+    "per_site_mae_iqr": 1.1918
+  },
+  "fit_row_count": 2160
+}

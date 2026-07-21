@@ -1,0 +1,8 @@
+# Raw data placeholder.
+#
+# Place original Hong Kong Hospital Authority A&E Waiting Time JSON/XLSX
+# exports here. Do NOT edit these files once placed — they are the immutable
+# source of truth. All derived artifacts come from reproducible code in
+# src/ed_ops/ and pipeline/.
+#
+# Retrieval instructions: see ../DATA_SOURCE.md
