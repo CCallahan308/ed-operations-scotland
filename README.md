@@ -61,21 +61,43 @@ python -m streamlit run app.py
 
 Screenshots: `reports/figures/dashboard_*.png`.
 
-## How to reproduce
+## Quickstart (clone and run)
 
 ```bash
-python -m venv .venv && source .venv/Scripts/activate   # Windows Git Bash
+# 1. Clone and enter
+git clone <repo-url> ed-operations-scotland && cd ed-operations-scotland
+
+# 2. Create an isolated environment (Python 3.11+ recommended; 3.10 works)
+python -m venv .venv
+source .venv/bin/activate            # Windows: .venv\Scripts\activate
+
+# 3. Install pinned dependencies
 pip install -r requirements.txt
 
-# Run the full test suite (92 tests)
-python -m pytest tests/ -v
+# 4. Fetch the real dataset (~5 MB, Public Health Scotland, OGL v3.0)
+python scripts/fetch_data.py         # add --all for the optional companion files
+#    ...or skip this step: the suite runs a committed 5-site fixture
+#    (tests/fixtures/activity_sample.csv), so pytest works with no download.
+#    Full-data tests skip with a clear message until you fetch.
 
-# Rebuild the primary panel from raw
-python -c "import sys; sys.path.insert(0,'src'); from ed_ops.data_quality import build_primary_panel; build_primary_panel().to_parquet('data/processed/primary_panel_type1.parquet', index=False)"
+# 5. Run the tests
+python -m pytest tests/ -q
+#    with full data : 99 passed
+#    fixture only    : 28 passed, 71 skipped (full-data tests need step 4)
 
-# Re-score the holdout (NOTE: this is a reused evaluation if run again; see docs/HOLDOUT_PHASE6.md)
+# 6. (optional) Regenerate the holdout evaluation from raw (needs step 4)
 PYTHONPATH=src python pipeline/score_holdout.py
+
+# 7. Launch the dashboard
+python -m streamlit run app.py
 ```
+
+**Reproducibility.** Dependencies are pinned (`scikit-learn>=1.6.1,<1.8`). The model
+configuration is frozen in `reports/candidate_a_config.json` and loaded at scoring
+time (no hyperparameter search runs during evaluation), so the holdout result is
+stable across machines. `scripts/fetch_data.py` verifies every download against the
+SHA-256 recorded in `src/ed_ops/config.py` (the 2026-07-21 snapshot); a mismatch
+means Public Health Scotland has updated the dataset since then.
 
 ## Methodological discipline
 

@@ -6,6 +6,13 @@ import pandas as pd
 import pytest
 
 from ed_ops import features
+from ed_ops.config import RAW_DIR
+
+requires_full_data = pytest.mark.skipif(
+    not (RAW_DIR / "nhs_scotland_ae_activity_monthly.csv").exists(),
+    reason="Full PHS dataset absent -- run `python scripts/fetch_data.py` (see README Quickstart).",
+)
+pytestmark = requires_full_data
 
 # ---------------------------------------------------------------------------
 # Leakage guards (L1, L2) - the most important tests in the project

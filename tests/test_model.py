@@ -14,7 +14,13 @@ import pytest
 
 from ed_ops import features as features_mod
 from ed_ops import model as model_mod
+from ed_ops.config import RAW_DIR
 from ed_ops.splits import DEFAULT_SPLIT_WINDOWS, build_temporal_split
+
+requires_full_data = pytest.mark.skipif(
+    not (RAW_DIR / "nhs_scotland_ae_activity_monthly.csv").exists(),
+    reason="Full PHS dataset absent -- run `python scripts/fetch_data.py` (see README Quickstart).",
+)
 
 
 @pytest.fixture(scope="module")
@@ -29,6 +35,7 @@ def candidate():
 # ---------------------------------------------------------------------------
 
 
+@requires_full_data
 class TestFrozenConfig:
     """Pin the configuration that was selected on validation. Any change here
     requires a new decision-log entry before re-freezing."""
@@ -89,6 +96,7 @@ class TestFrozenConfig:
 # ---------------------------------------------------------------------------
 
 
+@requires_full_data
 class TestNoHoldoutLeakage:
     """Training must use only train + validation. The holdout partition
     (2025-06 onwards) must not influence the model in any way."""
@@ -125,6 +133,7 @@ class TestNoHoldoutLeakage:
 # ---------------------------------------------------------------------------
 
 
+@requires_full_data
 class TestValidationPerformance:
     """Candidate A (ensemble) must beat the persistence baseline on validation
     MAE. This is the gate defined in D016."""
@@ -154,6 +163,7 @@ class TestValidationPerformance:
 # ---------------------------------------------------------------------------
 
 
+@requires_full_data
 class TestEnsembleMechanics:
     def test_predict_equals_weighted_blend(self, candidate):
         """Final prediction must equal w*tree + (1-w)*persistence, clipped."""
@@ -184,6 +194,7 @@ class TestEnsembleMechanics:
 # ---------------------------------------------------------------------------
 
 
+@requires_full_data
 class TestConfigPersistence:
     def test_save_config_writes_valid_json(self, candidate, tmp_path):
         path = candidate.save_config(tmp_path / "test_config.json")
@@ -198,6 +209,7 @@ class TestConfigPersistence:
 class TestReproducibleSelection:
     """Guardrails added when frozen scoring was decoupled from the search."""
 
+    @requires_full_data
     def test_scoring_uses_frozen_config_not_search(self, monkeypatch):
         """build_frozen_candidate must NOT invoke the hyperparameter search.
         Proven by making train_candidate_a explode; frozen scoring must still
@@ -213,6 +225,7 @@ class TestReproducibleSelection:
         assert cand.config.learning_rate == 0.03
         assert cand.config.ensemble_weight_ca == 0.4
 
+    @requires_full_data
     def test_fit_from_config_is_deterministic(self):
         """Fitting the frozen config twice yields identical validation MAE."""
         from ed_ops.model import build_frozen_candidate
@@ -222,6 +235,7 @@ class TestReproducibleSelection:
             == (build_frozen_candidate().val_metrics["mae"])
         )
 
+    @requires_full_data
     def test_frozen_within_tolerance_of_search_best(self):
         """The frozen config's validation MAE must be within the selection
         tolerance of the best candidate the search finds. This proves the frozen

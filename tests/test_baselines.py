@@ -11,7 +11,13 @@ import pandas as pd
 import pytest
 
 from ed_ops import baselines, evaluation
+from ed_ops.config import RAW_DIR
 from ed_ops.splits import build_temporal_split
+
+requires_full_data = pytest.mark.skipif(
+    not (RAW_DIR / "nhs_scotland_ae_activity_monthly.csv").exists(),
+    reason="Full PHS dataset absent -- run `python scripts/fetch_data.py` (see README Quickstart).",
+)
 
 # ---------------------------------------------------------------------------
 # Synthetic fixtures with KNOWN answers (so we can verify the math)
@@ -210,6 +216,7 @@ class TestEvaluate:
 # ---------------------------------------------------------------------------
 
 
+@requires_full_data
 class TestRealDataBaselines:
     """On the real panel, baselines must produce plausible metrics. These
     tests catch the kind of bug where a column mix-up produces MAE=0."""

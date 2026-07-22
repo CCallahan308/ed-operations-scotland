@@ -10,6 +10,13 @@ import pytest
 
 from ed_ops import config
 from ed_ops import data_quality as dq
+from ed_ops.config import RAW_DIR
+
+requires_full_data = pytest.mark.skipif(
+    not (RAW_DIR / "nhs_scotland_ae_activity_monthly.csv").exists(),
+    reason="Full PHS dataset absent -- run `python scripts/fetch_data.py` (see README Quickstart).",
+)
+pytestmark = requires_full_data
 
 # ---------------------------------------------------------------------------
 # Raw-data integrity (Phase 0 evidence: SHA + row counts must hold)
@@ -48,6 +55,8 @@ class TestRawIntegrity:
         import hashlib
 
         path = config.RAW_DIR / filename
+        if not path.exists():
+            pytest.skip(f"optional companion {filename} absent; run scripts/fetch_data.py --all")
         h = hashlib.sha256(path.read_bytes()).hexdigest()
         assert h == config.SOURCE_PROVENANCE[name][0], f"{filename} SHA mismatch"
 
