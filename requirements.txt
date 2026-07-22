@@ -1,30 +1,6 @@
-# ------------------------------------------------------------------------------
-# Dependencies for ed-operations-scotland.
-# requirements.txt is the single source of truth for runtime dependencies
-# (pyproject.toml carries only tool config: ruff, pytest). Upper bounds are
-# deliberate: scikit-learn's HistGradientBoosting binning changed at 1.6, which
-# reorders the near-tied hyperparameter candidates, so the version is pinned to
-# a tested range. Verified identical results on scikit-learn 1.6.1 and 1.7.2.
-# ------------------------------------------------------------------------------
-
-# Core data
-pandas>=2.2,<3
-numpy>=1.26,<3
-pyarrow>=15.0,<22
-
-# Modeling (gradient-boosted tree + persistence ensemble)
-scikit-learn>=1.6.1,<1.8
-
-# SQL / BI analytics layer
-duckdb>=1.0,<2
-
-# Plotting (error-analysis figures)
-matplotlib>=3.8,<4
-
-# Dashboard
+# Runtime dependencies for the Streamlit dashboard (app.py).
+# The app renders from committed JSON artifacts, so it needs no ML/SQL/parquet
+# libraries. The full pipeline, tests, and CI use requirements-dev.txt.
 streamlit>=1.36,<2
 plotly>=5.22,<7
-
-# Validation, testing, lint/format
-pytest>=8.0,<9
-ruff>=0.4
+pandas>=2.2,<3
