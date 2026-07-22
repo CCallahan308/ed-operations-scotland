@@ -82,8 +82,8 @@ python scripts/fetch_data.py         # add --all for the optional companion file
 
 # 5. Run the tests
 python -m pytest tests/ -q
-#    with full data : 99 passed
-#    fixture only    : 28 passed, 71 skipped (full-data tests need step 4)
+#    with full data : 103 passed
+#    fixture only    : 30 passed, 73 skipped (full-data tests need step 4)
 
 # 6. (optional) Regenerate the holdout evaluation from raw (needs step 4)
 PYTHONPATH=src python pipeline/score_holdout.py
@@ -104,7 +104,7 @@ means Public Health Scotland has updated the dataset since then.
 `.github/workflows/ci.yml` runs on every push and pull request against Python 3.11
 and 3.12: `ruff check`, `ruff format --check`, and `pytest`. CI uses only the
 committed fixture (no data download, no secrets), so it reports the fixture-only
-result (28 passed, 71 skipped). Reproduce the CI checks locally:
+result (30 passed, 73 skipped). Reproduce the CI checks locally:
 
 ```bash
 ruff check src/ tests/ pipeline/ app.py scripts/
@@ -114,6 +114,22 @@ pytest tests/ -q
 
 A CI status badge will be added here once the repository is pushed and the first
 workflow run passes.
+
+## SQL / BI layer
+
+`sql/` is a runnable DuckDB analytics layer that rebuilds the model from the raw CSV
+independently of the Python code: a `fact_site_month` fact table, `dim_site` /
+`dim_board` / `dim_calendar` dimensions, and count-ratio aggregations
+(`agg_by_month`, `agg_by_board_month`, `agg_annual_median`, `agg_by_site`), plus
+data-quality gates. Aggregations use `SUM(within4)/SUM(total)`, never an average of
+percentages. `scripts/run_sql.py` runs the gates and reconciles the SQL fact table to
+`build_primary_panel` row-for-row (7,022 rows; compliance within 0.01 pp of the Python
+value). See [`docs/BI_DATA_MODEL.md`](docs/BI_DATA_MODEL.md).
+
+```bash
+python scripts/run_sql.py            # full dataset
+python scripts/run_sql.py --fixture  # committed fixture, no download
+```
 
 ## Methodological discipline
 
