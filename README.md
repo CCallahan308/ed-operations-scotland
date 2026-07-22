@@ -99,6 +99,22 @@ stable across machines. `scripts/fetch_data.py` verifies every download against 
 SHA-256 recorded in `src/ed_ops/config.py` (the 2026-07-21 snapshot); a mismatch
 means Public Health Scotland has updated the dataset since then.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and pull request against Python 3.11
+and 3.12: `ruff check`, `ruff format --check`, and `pytest`. CI uses only the
+committed fixture (no data download, no secrets), so it reports the fixture-only
+result (28 passed, 71 skipped). Reproduce the CI checks locally:
+
+```bash
+ruff check src/ tests/ pipeline/ app.py scripts/
+ruff format --check src/ tests/ pipeline/ app.py scripts/
+pytest tests/ -q
+```
+
+A CI status badge will be added here once the repository is pushed and the first
+workflow run passes.
+
 ## Methodological discipline
 
 This project follows the standard of a senior analytics professional:

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import platform
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -124,7 +124,7 @@ def score_holdout_once(output_path: Path | None = None) -> dict:
             "numpy": np.__version__,
             "activity_sha256": ed_config.SOURCE_PROVENANCE["activity_monthly"][0],
             "random_seed": ed_config.RANDOM_SEED,
-            "scored_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
+            "scored_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),  # noqa: UP017
         },
         "candidate_a_holdout_metrics": m_ca.as_dict(),
         "candidate_a_mae_95ci": [round(float(ci_low), 4), round(float(ci_high), 4)],
