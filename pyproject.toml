@@ -5,6 +5,11 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+# app.py: long lines are markdown table rows / display strings where wrapping
+# would break the rendered output in the Streamlit dashboard.
+"app.py" = ["E501"]
+
 [tool.black]
 line-length = 100
 target-version = ["py311"]

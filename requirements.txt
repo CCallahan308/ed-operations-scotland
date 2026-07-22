@@ -9,6 +9,10 @@ scikit-learn>=1.4
 # Plotting (Phase 5/6 error-analysis figures)
 matplotlib>=3.8
 
+# Dashboard (Streamlit app)
+streamlit>=1.36
+plotly>=5.22
+
 # Validation, testing, lint/format
 pytest>=8.0
 ruff>=0.4

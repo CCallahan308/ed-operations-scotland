@@ -33,17 +33,33 @@ The recurring decision: *each month, NHS board operations must decide where to f
 
 ```
 ed-operations-scotland/
+├── app.py            # Streamlit dashboard (5 pages, scoped to real artifacts)
 ├── data/
 │   ├── raw/         # immutable PHS exports (5 CSVs; gitignored)
 │   ├── external/    # reserved for holidays/weather (not used in v1)
 │   └── processed/   # primary_panel_type1.parquet, split_manifest.csv
-├── docs/            # 7 phase deliverables + execution plan
+├── docs/            # 7 phase deliverables + execution plan + review handoff
 ├── pipeline/        # score_holdout.py (one-shot Phase 6 scoring)
-├── reports/         # configs, metrics, figures
+├── reports/         # configs, metrics, figures (incl. dashboard screenshots)
 ├── sql/             # reserved (v2 BI layer)
 ├── src/ed_ops/      # config, data_quality, splits, baselines, features, model, evaluation
-└── tests/           # 85 tests across 6 modules
+└── tests/           # 88 tests across 6 modules
 ```
+
+## Dashboard
+
+A Streamlit dashboard surfaces the real project artifacts across 5 pages:
+**Overview** (honest headline + holdout CI), **The data** (panel + structural break),
+**The split** (train/val/holdout + leakage controls), **Forecast** (Candidate A vs
+persistence on holdout, by-site drilldown, worst errors), and **Model** (frozen config,
+feature importance, limitations). No fabricated KPIs — every figure is computed from
+the actual model and data.
+
+```bash
+python -m streamlit run app.py
+```
+
+Screenshots: `reports/figures/dashboard_*.png`.
 
 ## How to reproduce
 
@@ -51,7 +67,7 @@ ed-operations-scotland/
 python -m venv .venv && source .venv/Scripts/activate   # Windows Git Bash
 pip install -r requirements.txt
 
-# Run the full test suite (85 tests)
+# Run the full test suite (88 tests)
 python -m pytest tests/ -v
 
 # Rebuild the primary panel from raw
@@ -74,6 +90,7 @@ This project follows the standard of a senior analytics professional:
 
 | Doc | Purpose |
 |---|---|
+| [`docs/REVIEW_HANDOFF.md`](docs/REVIEW_HANDOFF.md) | **Review board handoff** — what to challenge, what's defensible, success criteria. *Start here for external review.* |
 | [`docs/candidate_a_hong_kong_execution_plan.md`](docs/candidate_a_hong_kong_execution_plan.md) | Authoritative execution record (Phases 0–7, decisions D001–D021) |
 | [`docs/PROBLEM_FRAMING.md`](docs/PROBLEM_FRAMING.md) | Phase 1: decision, target, metrics, leakage surface, non-claims |
 | [`docs/DATA_QUALITY.md`](docs/DATA_QUALITY.md) | Phase 2: findings F001–F005, cleaning rules |
