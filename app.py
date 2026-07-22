@@ -1,83 +1,54 @@
-"""ED Operations Analytics — NHS Scotland A&E Compliance Forecasting.
+"""ED Operations Analytics - NHS Scotland A&E Compliance Forecasting.
 
-Streamlit dashboard. Thin wiring: all data/math lives in src/ed_ops/ and the
-frozen reports/. The app only loads real artifacts and renders them.
+Streamlit dashboard. A thin view over committed artifacts: it reads
+reports/dashboard_data.json and reports/holdout_evaluation.json and renders them.
+It needs neither the raw dataset nor a model fit at launch, so it deploys cleanly
+(regenerate the artifacts with scripts/build_dashboard_data.py after any change).
 
-Pages (scoped to what genuinely exists — no fabricated KPIs):
-  1. Overview      — the honest headline result + holdout CI
-  2. The data      — the cleaned panel and the structural break
-  3. The split      — train/validation/holdout windows
-  4. Forecast      — Candidate A vs persistence on the holdout
-  5. Model         — frozen config, feature importance, limitations
+Pages (scoped to what genuinely exists - no fabricated KPIs):
+  1. Overview  - the honest headline result + holdout CI
+  2. The data  - the cleaned panel and the structural break
+  3. The split - train/validation/holdout windows
+  4. Forecast  - Candidate A vs persistence on the holdout
+  5. Model     - frozen config, feature importance, limitations
 """
 
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-sys.path.insert(0, str(Path(__file__).parent / "src"))
-
-from ed_ops import features as features_mod  # noqa: E402
-from ed_ops.data_quality import build_primary_panel  # noqa: E402
-from ed_ops.evaluation import evaluate  # noqa: E402
-from ed_ops.model import train_candidate_a  # noqa: E402
-from ed_ops.splits import build_temporal_split  # noqa: E402
-
 st.set_page_config(
     page_title="NHS Scotland A&E Compliance Forecasting",
-    page_icon="🏥",
+    page_icon="\U0001f3e5",
     layout="wide",
 )
 
 REPORTS = Path(__file__).parent / "reports"
 
-
-# ---------------------------------------------------------------------------
-# Cached data loaders (rebuilt from raw; deterministic)
-# ---------------------------------------------------------------------------
-
-
-@st.cache_data(show_spinner="Building primary panel from raw...")
-def get_panel() -> pd.DataFrame:
-    return build_primary_panel()
-
-
-@st.cache_data(show_spinner="Building temporal split...")
-def get_split():
-    return build_temporal_split()
-
-
-@st.cache_resource(show_spinner="Training Candidate A (frozen config)...")
-def get_candidate():
-    # train_candidate_a returns (candidate, search_df); we only need the candidate.
-    candidate, _ = train_candidate_a()
-    return candidate
-
-
-@st.cache_data
-def get_holdout_payload() -> dict:
-    return json.loads((REPORTS / "holdout_evaluation.json").read_text())
-
-
-@st.cache_data
-def get_feature_importance() -> pd.DataFrame:
-    return pd.read_csv(REPORTS / "candidate_a_feature_importance.csv")
-
-
-# ---------------------------------------------------------------------------
-# Shared viz helpers
-# ---------------------------------------------------------------------------
-
 NAVY = "#0b2545"
 ACCENT = "#d62828"
 MUTED = "#6c757d"
-GOOD = "#2a9d8f"
+
+
+# ---------------------------------------------------------------------------
+# Artifact loaders (committed JSON; no raw data or model fit required)
+# ---------------------------------------------------------------------------
+
+
+@st.cache_data
+def load_json(name: str) -> dict | None:
+    path = REPORTS / name
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def kpi_card(label: str, value: str, sub: str = "", color: str = NAVY):
@@ -96,8 +67,13 @@ def kpi_card(label: str, value: str, sub: str = "", color: str = NAVY):
 
 
 def month_to_date(month_int: int) -> pd.Timestamp:
-    """202401 -> 2024-01-01."""
     return pd.Timestamp(year=month_int // 100, month=month_int % 100, day=1)
+
+
+def _base_layout(fig: go.Figure, **kw) -> go.Figure:
+    kw.setdefault("margin", dict(l=10, r=10, t=30, b=10))
+    fig.update_layout(**kw)
+    return fig
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +81,7 @@ def month_to_date(month_int: int) -> pd.Timestamp:
 # ---------------------------------------------------------------------------
 
 
-def page_overview():
+def page_overview(data: dict, payload: dict):
     st.title("NHS Scotland A&E Compliance Forecasting")
     st.caption(
         "1-month-ahead site-level forecast of 4-hour compliance %. "
@@ -113,9 +89,13 @@ def page_overview():
         "+ persistence ensemble."
     )
 
-    payload = get_holdout_payload()
     m = payload["candidate_a_holdout_metrics"]
     bm = payload["baseline_holdout_metrics"]
+    improvement = payload["improvement_vs_persistence_pp"]
+    ci = payload["candidate_a_mae_95ci"]
+    imp_ci = payload.get("improvement_95ci_pp")
+    dir_ca = m["directional_accuracy"] * 100
+    dir_seasonal = bm["seasonal_naive"]["directional_accuracy"] * 100
 
     st.markdown("### The result (honest)")
     st.markdown(
@@ -126,10 +106,9 @@ def page_overview():
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         kpi_card(
-            "Candidate A — holdout MAE",
+            "Candidate A - holdout MAE",
             f"{m['mae']:.2f} pp",
-            f"95% CI [{payload['candidate_a_mae_95ci'][0]:.2f}, "
-            f"{payload['candidate_a_mae_95ci'][1]:.2f}]",
+            f"95% CI [{ci[0]:.2f}, {ci[1]:.2f}]",
             NAVY,
         )
     with c2:
@@ -137,7 +116,6 @@ def page_overview():
             "Persistence baseline", f"{bm['persistence']['mae']:.2f} pp", "the bar to beat", MUTED
         )
     with c3:
-        improvement = payload["improvement_vs_persistence_pp"]
         kpi_card(
             "Improvement vs bar",
             f"+{improvement:.2f} pp",
@@ -145,27 +123,29 @@ def page_overview():
             ACCENT,
         )
     with c4:
+        # Honest framing: directional accuracy is near chance and BELOW seasonal
+        # naive, so it is shown neutrally, not as a success metric.
         kpi_card(
             "Directional accuracy",
-            f"{m['directional_accuracy']:.0%}",
-            "vs persistence's structural ~0%",
-            GOOD,
+            f"{dir_ca:.1f}%",
+            f"near chance; below seasonal-naive ({dir_seasonal:.0f}%)",
+            MUTED,
         )
 
     st.markdown("")
-    with st.expander("⚠️ Why this is a *qualified* positive — read before interpreting"):
+    wins = sum(1 for r in payload["by_month"] if r["mae_ca"] < r["mae_pers"])
+    imp_ci_txt = f"**[{imp_ci[0]:+.3f}, {imp_ci[1]:+.3f}]**" if imp_ci else "including zero"
+    with st.expander("Why this is a *qualified* positive - read before interpreting"):
         st.markdown(
             f"""
             - **Point-estimate improvement:** Candidate A beats persistence by **+{improvement:.2f} pp**
-              on the holdout (wins {payload["by_month"] and sum(1 for r in payload["by_month"] if r["mae_ca"] < r["mae_pers"])}/12 months).
+              on the holdout (wins {wins}/12 months).
             - **Statistical significance:** the paired-bootstrap 95% CI on the improvement is
-              **[{payload["improvement_95ci_pp"][0]:+.3f}, {payload["improvement_95ci_pp"][1]:+.3f}]** — it **includes zero**. We cannot rule out that the two are
+              {imp_ci_txt} - it **includes zero**. We cannot rule out that the two are
               indistinguishable on a 12-month window.
-            - **Structural break:** Scotland A&E compliance has fallen from ~97% (2007) to ~67% (2026)
-              and is still declining. The model is evaluated on its ability to forecast *through* this
-              regime change — the honest problem, but a hard one. Candidate A's bias grew from +0.14 pp
-              (validation) to +0.66 pp (holdout) as the regime kept drifting.
-            - **Failure mode:** the model smooths. It does not predict sharp one-month drops — and
+            - **Directional skill is near chance:** {dir_ca:.1f}%, below the seasonal-naive
+              baseline ({dir_seasonal:.0f}%). The model's advantage is level calibration, not direction.
+            - **Failure mode:** the model smooths. It does not predict sharp one-month drops - and
               those are the highest-stakes months.
 
             See `docs/HOLDOUT_PHASE6.md` for the full evaluation.
@@ -176,7 +156,6 @@ def page_overview():
     st.markdown("### Holdout: monthly MAE")
     by_month = pd.DataFrame(payload["by_month"])
     by_month["date"] = by_month["target_month"].apply(month_to_date)
-
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
@@ -196,11 +175,21 @@ def page_overview():
             line=dict(color=MUTED, width=2, dash="dash"),
         )
     )
-    fig.update_layout(
+    fig.add_annotation(
+        x=by_month["date"].iloc[-1],
+        y=by_month["mae_ca"].iloc[-1],
+        text="lines track closely: improvement CI includes zero",
+        showarrow=True,
+        arrowhead=2,
+        ax=-40,
+        ay=-40,
+        font=dict(size=11, color=MUTED),
+    )
+    _base_layout(
+        fig,
         xaxis_title="Holdout month",
         yaxis_title="MAE (pp)",
         height=350,
-        margin=dict(l=10, r=10, t=30, b=10),
         legend=dict(orientation="h", y=1.1),
     )
     st.plotly_chart(fig, use_container_width=True)
@@ -208,12 +197,12 @@ def page_overview():
     st.markdown("### What this dashboard shows (and doesn't)")
     st.markdown(
         """
-        **Shows:** the real artifacts the project produced — the cleaned panel, the temporal split,
+        **Shows:** the real artifacts the project produced - the cleaned panel, the temporal split,
         the holdout forecast-vs-actual, the baseline comparison, and the frozen model config.
 
         **Does not show:** patient-level data, intra-month nowcasting, causal intervention effects,
-        or any KPI the underlying aggregate data cannot support. See `docs/REVIEW_HANDOFF.md` §5
-        for the full list of explicit non-claims.
+        or any KPI the underlying aggregate data cannot support. See `docs/REVIEW_HANDOFF.md` for
+        the full list of explicit non-claims.
         """
     )
 
@@ -223,74 +212,70 @@ def page_overview():
 # ---------------------------------------------------------------------------
 
 
-def page_data():
+def page_data(data: dict, payload: dict):
     st.title("The data")
-    panel = get_panel()
-
+    s = data["panel_summary"]
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        kpi_card("Site-months", f"{len(panel):,}", "Type-1 EDs only", NAVY)
+        kpi_card("Site-months", f"{s['rows']:,}", "Type-1 EDs only", NAVY)
     with c2:
-        kpi_card("Sites", f"{panel['TreatmentLocation'].nunique()}", "Type-1 major A&E", NAVY)
+        kpi_card("Sites", f"{s['sites']}", "Type-1 major A&E", NAVY)
     with c3:
-        kpi_card(
-            "Months",
-            f"{panel['Month'].astype(int).nunique()}",
-            f"{panel['Month'].astype(int).min()} → {panel['Month'].astype(int).max()}",
-            NAVY,
-        )
+        kpi_card("Months", f"{s['months']}", f"{s['month_min']} -> {s['month_max']}", NAVY)
     with c4:
         kpi_card(
             "Compliance range",
-            f"{panel['compliance_pct'].min():.0f}–{panel['compliance_pct'].max():.0f}%",
-            f"median {panel['compliance_pct'].median():.1f}%",
+            f"{s['compliance_min']:.0f}-{s['compliance_max']:.0f}%",
+            f"median {s['compliance_median']:.1f}%",
             ACCENT,
         )
 
     st.markdown("### The structural break")
     st.markdown(
-        "Scotland A&E 4-hour compliance has fallen monotonically for 19 years and is **still declining**. "
+        "Scotland A&E 4-hour compliance has fallen for 19 years and is **still declining**. "
         "This is the dominant feature of the data and the dominant source of forecast error."
     )
-
-    # Annual median compliance trend
-    p = panel.copy()
-    p["Month"] = p["Month"].astype(int)
-    p["year"] = p["Month"] // 100
-    annual = p.groupby("year")["compliance_pct"].median().reset_index()
-
+    annual = pd.DataFrame(data["annual_median"])
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
             x=annual["year"],
-            y=annual["compliance_pct"],
+            y=annual["median_compliance"],
             mode="lines+markers",
             name="Median compliance",
             line=dict(color=ACCENT, width=3),
         )
     )
     fig.add_hline(y=95, line_dash="dot", line_color=MUTED, annotation_text="95% standard")
-    fig.update_layout(
-        xaxis_title="Year",
-        yaxis_title="Median 4-hour compliance (%)",
-        height=380,
-        margin=dict(l=10, r=10, t=30, b=10),
+    fig.add_annotation(
+        x=2022.5,
+        y=float(annual[annual["year"] >= 2023]["median_compliance"].max()),
+        text="2022->2023 break",
+        showarrow=True,
+        arrowhead=2,
+        ax=40,
+        ay=-30,
+        font=dict(size=11, color=ACCENT),
     )
+    _base_layout(fig, xaxis_title="Year", yaxis_title="Median 4-hour compliance (%)", height=380)
     st.plotly_chart(fig, use_container_width=True)
+
+    def med(lo, hi):
+        sub = annual[(annual["year"] >= lo) & (annual["year"] <= hi)]["median_compliance"]
+        return sub.median() if len(sub) else float("nan")
 
     st.markdown(
         f"""
-        - **2007–2017:** median ~{annual[annual["year"] <= 2017]["compliance_pct"].median():.0f}% (system near standard)
-        - **2018–2019:** median ~{annual[(annual["year"] >= 2018) & (annual["year"] <= 2019)]["compliance_pct"].median():.0f}%
-        - **2020–2022 (COVID):** median ~{annual[(annual["year"] >= 2020) & (annual["year"] <= 2022)]["compliance_pct"].median():.0f}%
-        - **2023–2026:** median ~{annual[annual["year"] >= 2023]["compliance_pct"].median():.0f}% — **no recovery, still falling**
+        - **2007-2017:** median ~{med(2007, 2017):.0f}% (system near standard)
+        - **2018-2019:** median ~{med(2018, 2019):.0f}%
+        - **2020-2022 (COVID):** median ~{med(2020, 2022):.0f}%
+        - **2023-2026:** median ~{med(2023, 2026):.0f}% - **no recovery, still falling**
 
-        The break is **2022→2023**, not 2020→2022. The model must forecast through this regime change.
+        The break is **2022->2023**, not 2020->2022. The model must forecast through it.
         """
     )
-
     st.markdown("### Panel preview")
-    st.dataframe(panel.head(20), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(data["panel_preview"]), use_container_width=True, hide_index=True)
 
 
 # ---------------------------------------------------------------------------
@@ -298,49 +283,40 @@ def page_data():
 # ---------------------------------------------------------------------------
 
 
-def page_split():
+def page_split(data: dict, payload: dict):
     st.title("The split")
-    split = get_split()
-
     st.markdown(
-        "Chronological (temporal) holdout — all sites in every partition, partitions differ only by "
+        "Chronological (temporal) holdout - all sites in every partition, partitions differ only by "
         "time. This is the only defensible strategy for a forward-looking forecast on a time series."
     )
-
-    parts = [
-        ("Train", split.train, NAVY),
-        ("Validation", split.validation, "#8d99ae"),
-        ("Holdout", split.holdout, ACCENT),
-    ]
-
-    c1, c2, c3 = st.columns(3)
-    for col, (name, part, color) in zip([c1, c2, c3], parts):
+    colors = {"train": NAVY, "validation": "#8d99ae", "holdout": ACCENT}
+    cols = st.columns(3)
+    for col, part in zip(cols, data["split_summary"]):
         with col:
             kpi_card(
-                f"{name}  [{part.start_month}–{part.end_month}]",
-                f"{len(part.df):,} rows",
-                f"{part.df['TreatmentLocation'].nunique()} sites · "
-                f"median {part.df['compliance_pct'].median():.1f}%",
-                color,
+                f"{part['partition'].title()}  [{part['start_month']}-{part['end_month']}]",
+                f"{part['n_rows']:,} rows",
+                f"{part['n_sites']} sites · median {part['compliance_median']:.1f}%",
+                colors.get(part["partition"], NAVY),
             )
 
     st.markdown("### Compliance distribution by partition")
     st.markdown(
-        "The ~22pp gap between train (median 89.3%) and holdout (median ~67%) is the structural "
-        "break made concrete. The model must extrapolate, not interpolate."
+        "The gap between train (median ~89%) and holdout (median ~67%) is the structural break made "
+        "concrete. The model must extrapolate, not interpolate."
     )
-
     fig = go.Figure()
-    for name, part, color in parts:
+    for part in data["split_summary"]:
+        name = part["partition"]
         fig.add_trace(
-            go.Box(y=part.df["compliance_pct"], name=name, marker_color=color, boxpoints=False)
+            go.Box(
+                y=data["split_box"][name],
+                name=name.title(),
+                marker_color=colors.get(name, NAVY),
+                boxpoints=False,
+            )
         )
-    fig.update_layout(
-        yaxis_title="4-hour compliance (%)",
-        height=380,
-        margin=dict(l=10, r=10, t=30, b=10),
-        showlegend=False,
-    )
+    _base_layout(fig, yaxis_title="4-hour compliance (%)", height=380, showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("### Leakage controls")
@@ -348,12 +324,12 @@ def page_split():
         """
         | ID | Control | Status |
         |---|---|---|
-        | L1 | No target column or its count-components in features | ✅ enforced by test |
-        | L2 | All lags ≤ month t; rolling windows exclude current month | ✅ enforced by test |
-        | L3 | Chronological split, no key overlap | ✅ enforced by test |
-        | L5 | Holdout scored exactly once | ✅ enforced procedurally |
+        | L1 | No target column or its count-components in features | enforced by test |
+        | L2 | All lags <= month t; rolling windows exclude current month | enforced by test |
+        | L3 | Chronological split, no key overlap | enforced by test |
+        | L5 | Holdout scored exactly once | enforced procedurally |
 
-        88 invariant tests guard these. See `docs/SPLIT_DESIGN.md`.
+        See `docs/SPLIT_DESIGN.md` and `tests/`.
         """
     )
 
@@ -363,34 +339,29 @@ def page_split():
 # ---------------------------------------------------------------------------
 
 
-def page_forecast():
+def page_forecast(data: dict, payload: dict):
     st.title("Forecast: Candidate A vs persistence")
-    candidate = get_candidate()
-    split = get_split()
-
-    ff = features_mod.FeatureBuilder().build()
-    lo, hi = split.windows["holdout"]
-    holdout = ff[(ff["target_month"] >= lo) & (ff["target_month"] <= hi)].copy()
-    holdout["pred_ca"] = candidate.predict(holdout)
-    holdout["pred_pers"] = holdout["prior_compliance"]
-    holdout["date"] = holdout["target_month"].apply(month_to_date)
-
-    m_ca = evaluate(holdout, pred_col="pred_ca")
-    m_pers = evaluate(holdout, pred_col="pred_pers")
+    hf = pd.DataFrame(data["holdout_forecast"])
+    if hf.empty:
+        st.info("No holdout forecast in the artifact. Run `scripts/build_dashboard_data.py`.")
+        return
+    hf["date"] = hf["month"].apply(month_to_date)
+    m = payload["candidate_a_holdout_metrics"]
+    bm = payload["baseline_holdout_metrics"]["persistence"]
 
     c1, c2 = st.columns(2)
     with c1:
         kpi_card(
-            "Candidate A — holdout MAE",
-            f"{m_ca.mae:.2f} pp",
-            f"bias {m_ca.mean_error:+.2f} pp · dir acc {m_ca.directional_accuracy:.0%}",
+            "Candidate A - holdout MAE",
+            f"{m['mae']:.2f} pp",
+            f"bias {m['mean_error']:+.2f} pp · dir acc {m['directional_accuracy'] * 100:.1f}% (near chance)",
             NAVY,
         )
     with c2:
         kpi_card(
-            "Persistence — holdout MAE",
-            f"{m_pers.mae:.2f} pp",
-            f"bias {m_pers.mean_error:+.2f} pp · dir acc {m_pers.directional_accuracy:.0%}",
+            "Persistence - holdout MAE",
+            f"{bm['mae']:.2f} pp",
+            f"bias {bm['mean_error']:+.2f} pp · always predicts 'no change'",
             MUTED,
         )
 
@@ -398,14 +369,14 @@ def page_forecast():
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=holdout["target_compliance"],
-            y=holdout["pred_ca"],
+            x=hf["actual"],
+            y=hf["pred_ca"],
             mode="markers",
             name="Candidate A",
             marker=dict(color=NAVY, size=6, opacity=0.5),
         )
     )
-    lims = [holdout["target_compliance"].min(), holdout["target_compliance"].max()]
+    lims = [float(hf["actual"].min()), float(hf["actual"].max())]
     fig.add_trace(
         go.Scatter(
             x=lims,
@@ -415,26 +386,25 @@ def page_forecast():
             line=dict(color=ACCENT, dash="dash", width=1.5),
         )
     )
-    fig.update_layout(
-        xaxis_title="Actual compliance (t+1)",
-        yaxis_title="Predicted",
-        height=420,
-        margin=dict(l=10, r=10, t=30, b=10),
+    fig.add_annotation(
+        x=lims[0] + 3,
+        y=lims[0] + 12,
+        text="model smooths: predictions sit above actual on sharp drops",
+        showarrow=False,
+        font=dict(size=11, color=MUTED),
+        xanchor="left",
     )
+    _base_layout(fig, xaxis_title="Actual compliance (t+1)", yaxis_title="Predicted", height=420)
     st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("### By site (select to inspect)")
-    site = st.selectbox(
-        "Site",
-        sorted(holdout["TreatmentLocation"].unique()),
-        index=0,
-    )
-    site_df = holdout[holdout["TreatmentLocation"] == site].sort_values("date")
+    site = st.selectbox("Site", sorted(hf["site"].unique()), index=0, label_visibility="collapsed")
+    sd = hf[hf["site"] == site].sort_values("date")
     fig2 = go.Figure()
     fig2.add_trace(
         go.Scatter(
-            x=site_df["date"],
-            y=site_df["target_compliance"],
+            x=sd["date"],
+            y=sd["actual"],
             mode="lines+markers",
             name="Actual",
             line=dict(color="#000", width=2.5),
@@ -442,8 +412,8 @@ def page_forecast():
     )
     fig2.add_trace(
         go.Scatter(
-            x=site_df["date"],
-            y=site_df["pred_ca"],
+            x=sd["date"],
+            y=sd["pred_ca"],
             mode="lines+markers",
             name="Candidate A",
             line=dict(color=NAVY, width=2),
@@ -451,46 +421,43 @@ def page_forecast():
     )
     fig2.add_trace(
         go.Scatter(
-            x=site_df["date"],
-            y=site_df["pred_pers"],
+            x=sd["date"],
+            y=sd["pred_pers"],
             mode="lines+markers",
             name="Persistence",
             line=dict(color=MUTED, width=2, dash="dash"),
         )
     )
-    fig2.update_layout(
+    _base_layout(
+        fig2,
         xaxis_title="Month",
         yaxis_title="Compliance (%)",
         height=380,
-        margin=dict(l=10, r=10, t=30, b=10),
         legend=dict(orientation="h", y=1.1),
     )
     st.plotly_chart(fig2, use_container_width=True)
 
     st.markdown("### Worst errors (the model's failure mode)")
     st.markdown(
-        "The largest errors are **sharp one-month drops** neither model anticipates — "
+        "The largest errors are **sharp one-month drops** neither model anticipates - "
         "exactly the high-stakes months."
     )
-    holdout["abs_err_ca"] = (holdout["pred_ca"] - holdout["target_compliance"]).abs()
-    worst = holdout.nlargest(10, "abs_err_ca")[
-        [
-            "TreatmentLocation",
-            "target_month",
-            "target_compliance",
-            "pred_ca",
-            "pred_pers",
-            "abs_err_ca",
+    hf["abs_err_ca"] = (hf["pred_ca"] - hf["actual"]).abs()
+    worst = (
+        hf.nlargest(10, "abs_err_ca")[
+            ["site", "month", "actual", "pred_ca", "pred_pers", "abs_err_ca"]
         ]
-    ].rename(
-        columns={
-            "TreatmentLocation": "Site",
-            "target_month": "Month",
-            "target_compliance": "Actual",
-            "pred_ca": "Candidate A",
-            "pred_pers": "Persistence",
-            "abs_err_ca": "|error|",
-        }
+        .round(2)
+        .rename(
+            columns={
+                "site": "Site",
+                "month": "Month",
+                "actual": "Actual",
+                "pred_ca": "Candidate A",
+                "pred_pers": "Persistence",
+                "abs_err_ca": "|error|",
+            }
+        )
     )
     st.dataframe(worst, use_container_width=True, hide_index=True)
 
@@ -500,59 +467,45 @@ def page_forecast():
 # ---------------------------------------------------------------------------
 
 
-def page_model():
+def page_model(data: dict, payload: dict):
     st.title("Model")
-    candidate = get_candidate()
-    fi = get_feature_importance()
-    payload = get_holdout_payload()
-
-    st.markdown("### Frozen configuration")
-    cfg = candidate.config
+    cfg = data["frozen_config"]
     c1, c2, c3 = st.columns(3)
     with c1:
         kpi_card("Model family", "Tree + persistence", "ensemble", NAVY)
     with c2:
-        kpi_card(
-            "Ensemble weight",
-            f"{cfg.ensemble_weight_ca}",
-            f"{cfg.ensemble_weight_ca}·tree + {1 - cfg.ensemble_weight_ca:.1f}·persistence",
-            NAVY,
-        )
+        w = cfg["ensemble_weight_ca"]
+        kpi_card("Ensemble weight", f"{w}", f"{w}·tree + {1 - w:.1f}·persistence", NAVY)
     with c3:
         kpi_card(
             "Features",
-            f"{len(candidate.feature_columns)}",
-            f"fit on {candidate.fit_row_count:,} train rows",
+            f"{len(data['feature_importance'])}",
+            "permutation importance on validation",
             NAVY,
         )
 
-    st.markdown("**Hyperparameters** (selected on validation only, D018)")
-    hp_cols = st.columns(5)
-    for col, (k, v) in zip(
-        hp_cols,
-        [
-            ("max_depth", cfg.max_depth),
-            ("learning_rate", cfg.learning_rate),
-            ("max_iter", cfg.max_iter),
-            ("l2_regularization", cfg.l2_regularization),
-            ("min_samples_leaf", cfg.min_samples_leaf),
-        ],
+    st.markdown(
+        "**Hyperparameters** (selected on validation, then frozen and loaded - not re-searched)"
+    )
+    hp = st.columns(5)
+    for col, k in zip(
+        hp, ["max_depth", "learning_rate", "max_iter", "l2_regularization", "min_samples_leaf"]
     ):
-        col.metric(k, str(v))
+        col.metric(k, str(cfg[k]))
 
     st.markdown("### Feature importance (permutation, on validation)")
     st.markdown(
-        "`f_compliance_lag1` dominates — the model leans on persistence, which is *why* "
-        "the ensemble formalizes that relationship rather than fighting it."
+        "`f_compliance_lag1` dominates - the model leans on persistence, which is *why* the "
+        "ensemble formalizes that relationship rather than fighting it."
     )
-    top = fi.head(12).iloc[::-1]  # reverse for horizontal bar
-    fig = go.Figure()
-    colors = [ACCENT if i == len(top) - 1 else NAVY for i in range(len(top))]
-    fig.add_trace(
-        go.Bar(x=top["importance_mean"], y=top["feature"], orientation="h", marker_color=colors)
+    fi = pd.DataFrame(data["feature_importance"]).head(12).iloc[::-1]
+    bar_colors = [ACCENT if i == len(fi) - 1 else NAVY for i in range(len(fi))]
+    fig = go.Figure(
+        go.Bar(x=fi["importance_mean"], y=fi["feature"], orientation="h", marker_color=bar_colors)
     )
-    fig.update_layout(
-        xaxis_title="Δ MAE when shuffled (pp)",
+    _base_layout(
+        fig,
+        xaxis_title="delta MAE when shuffled (pp)",
         height=450,
         margin=dict(l=180, r=20, t=20, b=20),
     )
@@ -561,17 +514,15 @@ def page_model():
     st.markdown("### Limitations (explicit)")
     for lim in payload["limitations"]:
         st.markdown(f"- {lim}")
-
-    st.markdown("")
     st.info(
-        "**Recommendation** (`docs/HOLDOUT_PHASE6.md`): treat Candidate A as a *complement* "
-        "to persistence, not a replacement — show both forecasts plus the directional flag. "
+        "**Recommendation** (`docs/HOLDOUT_PHASE6.md`): treat Candidate A as a *complement* to "
+        "persistence, not a replacement - show both forecasts plus the directional flag. "
         "Re-evaluate on a 24+ month holdout to tighten the CI."
     )
 
 
 # ---------------------------------------------------------------------------
-# Nav
+# Nav + robust missing-artifact state
 # ---------------------------------------------------------------------------
 
 PAGES = {
@@ -584,11 +535,26 @@ PAGES = {
 
 st.sidebar.title("NHS Scotland A&E")
 st.sidebar.caption("4-hour compliance forecasting")
+
+data = load_json("dashboard_data.json")
+payload = load_json("holdout_evaluation.json")
+
+if data is None or payload is None:
+    st.error(
+        "Dashboard artifacts are missing or unreadable.\n\n"
+        "Expected `reports/dashboard_data.json` and `reports/holdout_evaluation.json`.\n\n"
+        "Regenerate them (requires the dataset via `scripts/fetch_data.py`):\n"
+        "```\nPYTHONPATH=src python pipeline/score_holdout.py\n"
+        "python scripts/build_dashboard_data.py\n```"
+    )
+    st.stop()
+
 choice = st.sidebar.radio("Page", list(PAGES.keys()), label_visibility="collapsed")
 st.sidebar.divider()
+_imp = payload["improvement_vs_persistence_pp"]
 st.sidebar.markdown(
     "**Status:** model complete · holdout scored once\n\n"
-    "**Bar:** persistence MAE 2.87 pp\n\n"
-    "**Result:** +0.15 pp (CI includes zero)"
+    f"**Bar:** persistence MAE {payload['baseline_holdout_metrics']['persistence']['mae']:.2f} pp\n\n"
+    f"**Result:** +{_imp:.2f} pp (CI includes zero)"
 )
-PAGES[choice]()
+PAGES[choice](data, payload)

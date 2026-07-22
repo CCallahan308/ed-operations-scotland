@@ -1,0 +1,10 @@
+# Deploy-safe theme (matches the app palette). Streamlit Community Cloud reads this.
+[theme]
+base = "light"
+primaryColor = "#0b2545"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f8f9fa"
+textColor = "#212529"
+
+[server]
+headless = true

@@ -82,8 +82,8 @@ python scripts/fetch_data.py         # add --all for the optional companion file
 
 # 5. Run the tests
 python -m pytest tests/ -q
-#    with full data : 103 passed
-#    fixture only    : 30 passed, 73 skipped (full-data tests need step 4)
+#    with full data : 111 passed
+#    fixture only    : 37 passed, 74 skipped (full-data tests need step 4)
 
 # 6. (optional) Regenerate the holdout evaluation from raw (needs step 4)
 PYTHONPATH=src python pipeline/score_holdout.py
@@ -104,7 +104,7 @@ means Public Health Scotland has updated the dataset since then.
 `.github/workflows/ci.yml` runs on every push and pull request against Python 3.11
 and 3.12: `ruff check`, `ruff format --check`, and `pytest`. CI uses only the
 committed fixture (no data download, no secrets), so it reports the fixture-only
-result (30 passed, 73 skipped). Reproduce the CI checks locally:
+result (37 passed, 74 skipped). Reproduce the CI checks locally:
 
 ```bash
 ruff check src/ tests/ pipeline/ app.py scripts/
@@ -130,6 +130,21 @@ value). See [`docs/BI_DATA_MODEL.md`](docs/BI_DATA_MODEL.md).
 python scripts/run_sql.py            # full dataset
 python scripts/run_sql.py --fixture  # committed fixture, no download
 ```
+
+## Live demo / deployment
+
+The dashboard is a thin view over committed artifacts (`reports/dashboard_data.json`,
+`reports/holdout_evaluation.json`): it renders with **no raw data and no model fit at
+launch**, so it deploys cleanly and starts fast. Regenerate the artifacts after any
+model or data change with `python scripts/build_dashboard_data.py`.
+
+Deploy your own instance on Streamlit Community Cloud (free):
+
+1. Push this repository to GitHub.
+2. At https://share.streamlit.io, create an app pointing at `app.py` on `main`.
+3. No secrets and no data upload are required.
+
+_A hosted demo link will be added here once deployed._
 
 ## Methodological discipline
 
