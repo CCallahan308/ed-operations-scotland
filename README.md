@@ -2,7 +2,7 @@
 
 > Forecast next-month site-level 4-hour compliance % across NHS Scotland A&E departments, to help operations teams target capacity support proactively.
 >
-> **Status:** Phases 0–7 complete. 85 tests green. Holdout evaluated once.
+> **Status:** Phases 0–7 complete. 92 tests green. Holdout evaluated once.
 
 ## Headline result (honest)
 
@@ -10,11 +10,11 @@ Candidate A is a gradient-boosted-tree + persistence ensemble. On the held-out 1
 
 | Model | Holdout MAE | 95% CI | Notes |
 |---|---|---|---|
-| **Candidate A** | **2.72 pp** | [2.49, 2.94] | beats persistence on point estimate |
+| **Candidate A** | **2.72 pp** | [2.50, 2.95] | beats persistence on point estimate |
 | Persistence baseline | 2.87 pp | — | the bar |
 | Seasonal naive | 4.12 pp | — | biased high by structural break |
 
-**Candidate A beats persistence by +0.15 pp on the holdout, but the paired-bootstrap 95% CI on the improvement [-0.007, +0.302] includes zero — the gain is directionally real but not statistically significant on a 12-month evaluation window.** This is reported without hedging; see [`docs/HOLDOUT_PHASE6.md`](docs/HOLDOUT_PHASE6.md).
+**Candidate A beats persistence by +0.15 pp on the holdout, but the paired-bootstrap 95% CI on the improvement [-0.006, +0.299] includes zero — the gain is directionally real but not statistically significant on a 12-month evaluation window.** This is reported without hedging; see [`docs/HOLDOUT_PHASE6.md`](docs/HOLDOUT_PHASE6.md).
 
 ## What this is
 
@@ -43,7 +43,7 @@ ed-operations-scotland/
 ├── reports/         # configs, metrics, figures (incl. dashboard screenshots)
 ├── sql/             # reserved (v2 BI layer)
 ├── src/ed_ops/      # config, data_quality, splits, baselines, features, model, evaluation
-└── tests/           # 88 tests across 6 modules
+└── tests/           # 92 tests across 6 modules
 ```
 
 ## Dashboard
@@ -67,7 +67,7 @@ Screenshots: `reports/figures/dashboard_*.png`.
 python -m venv .venv && source .venv/Scripts/activate   # Windows Git Bash
 pip install -r requirements.txt
 
-# Run the full test suite (88 tests)
+# Run the full test suite (92 tests)
 python -m pytest tests/ -v
 
 # Rebuild the primary panel from raw
@@ -81,7 +81,7 @@ PYTHONPATH=src python pipeline/score_holdout.py
 
 This project follows the standard of a senior analytics professional:
 
-- **Leakage audit at every phase** — 85 tests enforce raw-data integrity, count identities, no-target-in-features (L1), all-lags-≤-t (L2), chronological split (L3), and no-holdout-in-training (L5).
+- **Leakage audit at every phase** — 92 tests enforce raw-data integrity, count identities, no-target-in-features (L1), all-lags-≤-t (L2), chronological split (L3), and no-holdout-in-training (L5).
 - **Honest baselines** — three baselines including seasonal naive; the actual bar turned out to be persistence (MAE 2.85 pp), not seasonal naive as originally framed.
 - **Honest reporting of a negative-leaning result** — when Candidate A's tree alone lost to persistence (Phase 5), it was reported, not tuned away. When the holdout improvement failed to reach statistical significance (Phase 6), the CI was reported, not hidden.
 - **Documented structural break** — NHS Scotland A&E compliance fell from ~97% (2007) to ~67% (2026) and is still declining. The model is evaluated on its ability to forecast *through* this regime change, which is the honest problem.

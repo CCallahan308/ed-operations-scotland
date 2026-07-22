@@ -62,14 +62,22 @@
   ],
   "val_metrics": {
     "n": 510,
-    "mae": 2.5091,
-    "rmse": 3.4393,
+    "mae": 2.5192,
+    "rmse": 3.4445,
     "directional_accuracy": 0.4824,
-    "median_abs_error": 1.9534,
-    "p90_abs_error": 5.5897,
-    "mean_error": 0.1445,
-    "per_site_mae_median": 2.2906,
-    "per_site_mae_iqr": 1.1918
+    "median_abs_error": 1.9212,
+    "p90_abs_error": 5.6129,
+    "mean_error": 0.1779,
+    "per_site_mae_median": 2.2887,
+    "per_site_mae_iqr": 1.2266
   },
-  "fit_row_count": 2160
+  "fit_row_count": 2160,
+  "provenance": {
+    "python": "3.10.12",
+    "scikit_learn": "1.6.1",
+    "numpy": "2.2.6",
+    "activity_sha256": "746a19c75e41d99709a3d8b2cb3c56701ab569805ae6574c8b2941410e84f6b0",
+    "random_seed": 20260721,
+    "regenerated_at_utc": "2026-07-22T18:54:05+00:00"
+  }
 }

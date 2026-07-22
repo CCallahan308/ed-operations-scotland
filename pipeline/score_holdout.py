@@ -14,14 +14,18 @@ Discipline enforced:
 from __future__ import annotations
 
 import json
+import platform
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
+import sklearn
 
 from ed_ops import baselines
+from ed_ops import config as ed_config
 from ed_ops import features as features_mod
 from ed_ops.evaluation import compare_models, evaluate
-from ed_ops.model import train_candidate_a
+from ed_ops.model import build_frozen_candidate
 from ed_ops.splits import build_temporal_split
 
 
@@ -34,8 +38,10 @@ def score_holdout_once(output_path: Path | None = None) -> dict:
     split = build_temporal_split()
     holdout_window = split.windows["holdout"]
 
-    # Train the frozen Candidate A (train+val only; holdout untouched)
-    candidate, _ = train_candidate_a()
+    # Load the FROZEN config and fit it -- NO hyperparameter search at scoring
+    # time. This is what makes the holdout reproducible: scoring cannot silently
+    # re-select a different candidate across scikit-learn versions.
+    candidate = build_frozen_candidate()
 
     # Build features on full panel, restrict to holdout TARGET months
     ff = features_mod.FeatureBuilder().build()
@@ -85,13 +91,25 @@ def score_holdout_once(output_path: Path | None = None) -> dict:
         .to_dict("records")
     )
 
-    # Bootstrap CI for Candidate A MAE (non-parametric, 1000 resamples)
+    # Bootstrap CI for Candidate A MAE (non-parametric, 10,000 resamples).
     rng = np.random.default_rng(20260721)
     abs_errors = (holdout_ff["prediction"] - holdout_ff["target_compliance"]).abs().to_numpy()
     boot_maes = [
-        rng.choice(abs_errors, size=len(abs_errors), replace=True).mean() for _ in range(1000)
+        rng.choice(abs_errors, size=len(abs_errors), replace=True).mean() for _ in range(10000)
     ]
     ci_low, ci_high = np.percentile(boot_maes, [2.5, 97.5])
+
+    # Paired bootstrap on the improvement over persistence, on the SAME rows:
+    #   diff_i = |persistence_i - actual_i| - |candidate_i - actual_i|
+    # positive => Candidate A is closer on row i. This is the load-bearing
+    # statistic: if its 95% CI includes zero the improvement is NOT significant.
+    pers_abs = (holdout_ff["prior_compliance"] - holdout_ff["target_compliance"]).abs().to_numpy()
+    paired_diff = pers_abs - abs_errors
+    improvement_mean = float(paired_diff.mean())
+    boot_diff = [
+        rng.choice(paired_diff, size=len(paired_diff), replace=True).mean() for _ in range(10000)
+    ]
+    imp_lo, imp_hi = np.percentile(boot_diff, [2.5, 97.5])
 
     payload = {
         "evaluation_type": "single_holdout_scoring",
@@ -100,8 +118,19 @@ def score_holdout_once(output_path: Path | None = None) -> dict:
         "holdout_sites": int(holdout_ff["TreatmentLocation"].nunique()),
         "holdout_months": int(holdout_ff["target_month"].nunique()),
         "frozen_config": candidate.config.to_dict(),
+        "provenance": {
+            "python": platform.python_version(),
+            "scikit_learn": sklearn.__version__,
+            "numpy": np.__version__,
+            "activity_sha256": ed_config.SOURCE_PROVENANCE["activity_monthly"][0],
+            "random_seed": ed_config.RANDOM_SEED,
+            "scored_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
+        },
         "candidate_a_holdout_metrics": m_ca.as_dict(),
         "candidate_a_mae_95ci": [round(float(ci_low), 4), round(float(ci_high), 4)],
+        "improvement_paired_mean_pp": round(improvement_mean, 4),
+        "improvement_95ci_pp": [round(float(imp_lo), 4), round(float(imp_hi), 4)],
+        "improvement_ci_includes_zero": bool(imp_lo <= 0.0 <= imp_hi),
         "baseline_holdout_metrics": {k: v.as_dict() for k, v in baseline_metrics.items()},
         "comparison_sorted_by_mae": comparison.reset_index().to_dict("records"),
         "candidate_a_beats_persistence_holdout": bool(

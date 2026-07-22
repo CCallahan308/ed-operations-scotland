@@ -45,21 +45,35 @@
       202505
     ]
   },
+  "provenance": {
+    "python": "3.10.12",
+    "scikit_learn": "1.6.1",
+    "numpy": "2.2.6",
+    "activity_sha256": "746a19c75e41d99709a3d8b2cb3c56701ab569805ae6574c8b2941410e84f6b0",
+    "random_seed": 20260721,
+    "scored_at_utc": "2026-07-22T18:54:17+00:00"
+  },
   "candidate_a_holdout_metrics": {
     "n": 360,
-    "mae": 2.7226,
-    "rmse": 3.477,
-    "directional_accuracy": 0.4861,
-    "median_abs_error": 2.1972,
-    "p90_abs_error": 5.5909,
-    "mean_error": 0.6557,
-    "per_site_mae_median": 2.7097,
-    "per_site_mae_iqr": 1.4617
+    "mae": 2.7231,
+    "rmse": 3.4791,
+    "directional_accuracy": 0.4806,
+    "median_abs_error": 2.2094,
+    "p90_abs_error": 5.629,
+    "mean_error": 0.6668,
+    "per_site_mae_median": 2.7008,
+    "per_site_mae_iqr": 1.4306
   },
   "candidate_a_mae_95ci": [
-    2.4879,
-    2.9405
+    2.5047,
+    2.9477
   ],
+  "improvement_paired_mean_pp": 0.1469,
+  "improvement_95ci_pp": [
+    -0.0063,
+    0.2992
+  ],
+  "improvement_ci_includes_zero": true,
   "baseline_holdout_metrics": {
     "persistence": {
       "n": 360,
@@ -99,14 +113,14 @@
     {
       "model": "candidate_a",
       "n": 360,
-      "mae": 2.7226,
-      "rmse": 3.477,
-      "directional_accuracy": 0.4861,
-      "median_abs_error": 2.1972,
-      "p90_abs_error": 5.5909,
-      "mean_error": 0.6557,
-      "per_site_mae_median": 2.7097,
-      "per_site_mae_iqr": 1.4617
+      "mae": 2.7231,
+      "rmse": 3.4791,
+      "directional_accuracy": 0.4806,
+      "median_abs_error": 2.2094,
+      "p90_abs_error": 5.629,
+      "mean_error": 0.6668,
+      "per_site_mae_median": 2.7008,
+      "per_site_mae_iqr": 1.4306
     },
     {
       "model": "persistence",
@@ -146,171 +160,171 @@
     }
   ],
   "candidate_a_beats_persistence_holdout": true,
-  "improvement_vs_persistence_pp": 0.1474,
+  "improvement_vs_persistence_pp": 0.1469,
   "worst_10_errors": [
     {
       "TreatmentLocation": "A111H",
       "target_month": 202605,
       "target_compliance": 57.69,
-      "prediction": 68.8221547528158,
+      "prediction": 68.81899676376739,
       "prior_compliance": 67.0,
-      "abs_error": 11.132154752815808
+      "abs_error": 11.12899676376739
     },
     {
       "TreatmentLocation": "G513H",
       "target_month": 202511,
       "target_compliance": 81.65,
-      "prediction": 92.37289747390591,
+      "prediction": 92.31193881212826,
       "prior_compliance": 93.16,
-      "abs_error": 10.722897473905903
+      "abs_error": 10.661938812128255
     },
     {
       "TreatmentLocation": "N411H",
       "target_month": 202507,
       "target_compliance": 57.62,
-      "prediction": 67.63656076174183,
+      "prediction": 67.51571925875602,
       "prior_compliance": 65.79,
-      "abs_error": 10.016560761741836
+      "abs_error": 9.895719258756024
     },
     {
       "TreatmentLocation": "H212H",
       "target_month": 202508,
       "target_compliance": 77.25,
-      "prediction": 86.83541593519547,
+      "prediction": 87.01065929038921,
       "prior_compliance": 86.82,
-      "abs_error": 9.58541593519547
+      "abs_error": 9.760659290389214
     },
     {
       "TreatmentLocation": "C418H",
       "target_month": 202512,
       "target_compliance": 70.67,
-      "prediction": 61.634929363175914,
+      "prediction": 61.66745039546619,
       "prior_compliance": 63.68,
-      "abs_error": 9.035070636824088
-    },
-    {
-      "TreatmentLocation": "H212H",
-      "target_month": 202603,
-      "target_compliance": 86.73,
-      "prediction": 77.78384714758937,
-      "prior_compliance": 75.07,
-      "abs_error": 8.946152852410634
+      "abs_error": 9.002549604533812
     },
     {
       "TreatmentLocation": "G107H",
       "target_month": 202512,
       "target_compliance": 56.54,
-      "prediction": 47.74008300497741,
+      "prediction": 47.74498015810266,
       "prior_compliance": 45.53,
-      "abs_error": 8.799916995022592
+      "abs_error": 8.795019841897336
     },
     {
       "TreatmentLocation": "G513H",
       "target_month": 202601,
       "target_compliance": 90.89,
-      "prediction": 82.20323328415746,
+      "prediction": 82.12935365445932,
       "prior_compliance": 82.35,
-      "abs_error": 8.686766715842538
+      "abs_error": 8.760646345540678
+    },
+    {
+      "TreatmentLocation": "H212H",
+      "target_month": 202603,
+      "target_compliance": 86.73,
+      "prediction": 77.99031710976857,
+      "prior_compliance": 75.07,
+      "abs_error": 8.739682890231435
     },
     {
       "TreatmentLocation": "S314H",
       "target_month": 202508,
       "target_compliance": 62.13,
-      "prediction": 70.54835179083469,
+      "prediction": 70.83401877057219,
       "prior_compliance": 73.31,
-      "abs_error": 8.418351790834684
+      "abs_error": 8.704018770572183
     },
     {
-      "TreatmentLocation": "H212H",
+      "TreatmentLocation": "T101H",
       "target_month": 202602,
-      "target_compliance": 75.07,
-      "prediction": 83.33651813436528,
-      "prior_compliance": 80.81,
-      "abs_error": 8.266518134365285
+      "target_compliance": 90.82,
+      "prediction": 82.48928509433988,
+      "prior_compliance": 82.91,
+      "abs_error": 8.330714905660116
     }
   ],
   "by_month": [
     {
       "target_month": 202506,
       "n": 30,
-      "mae_ca": 3.032,
+      "mae_ca": 3.039,
       "mae_pers": 2.757,
       "mean_actual": 72.484
     },
     {
       "target_month": 202507,
       "n": 30,
-      "mae_ca": 2.652,
+      "mae_ca": 2.672,
       "mae_pers": 2.39,
       "mean_actual": 72.833
     },
     {
       "target_month": 202508,
       "n": 30,
-      "mae_ca": 3.232,
+      "mae_ca": 3.22,
       "mae_pers": 3.595,
       "mean_actual": 70.091
     },
     {
       "target_month": 202509,
       "n": 30,
-      "mae_ca": 2.277,
+      "mae_ca": 2.261,
       "mae_pers": 2.108,
       "mean_actual": 69.792
     },
     {
       "target_month": 202510,
       "n": 30,
-      "mae_ca": 2.215,
+      "mae_ca": 2.222,
       "mae_pers": 2.288,
       "mean_actual": 69.243
     },
     {
       "target_month": 202511,
       "n": 30,
-      "mae_ca": 2.991,
+      "mae_ca": 3.008,
       "mae_pers": 3.154,
       "mean_actual": 68.42
     },
     {
       "target_month": 202512,
       "n": 30,
-      "mae_ca": 2.658,
+      "mae_ca": 2.656,
       "mae_pers": 2.391,
       "mean_actual": 69.155
     },
     {
       "target_month": 202601,
       "n": 30,
-      "mae_ca": 3.229,
+      "mae_ca": 3.207,
       "mae_pers": 3.415,
       "mean_actual": 67.591
     },
     {
       "target_month": 202602,
       "n": 30,
-      "mae_ca": 2.624,
+      "mae_ca": 2.644,
       "mae_pers": 2.602,
       "mean_actual": 68.539
     },
     {
       "target_month": 202603,
       "n": 30,
-      "mae_ca": 2.701,
+      "mae_ca": 2.673,
       "mae_pers": 3.517,
       "mean_actual": 70.012
     },
     {
       "target_month": 202604,
       "n": 30,
-      "mae_ca": 2.576,
+      "mae_ca": 2.595,
       "mae_pers": 2.967,
       "mean_actual": 70.171
     },
     {
       "target_month": 202605,
       "n": 30,
-      "mae_ca": 2.485,
+      "mae_ca": 2.48,
       "mae_pers": 3.257,
       "mean_actual": 70.252
     }

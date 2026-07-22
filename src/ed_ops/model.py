@@ -236,12 +236,11 @@ def train_candidate_a(
     # Persistence predictions on validation (constant across tree candidates)
     pers_val = val_ff["prior_compliance"].to_numpy(dtype=float)
 
-    # Search over (tree params, ensemble weight)
+    # Search over (tree params, ensemble weight). Selection happens AFTER the
+    # full sweep via select_config_deterministic (tolerance + simpler tie-break),
+    # not a running argmin, so it is stable when the top candidates fall within
+    # the tolerance of each other (they do: < 0.01 pp validation MAE apart).
     search_rows = []
-    best_mae = float("inf")
-    best_params = None
-    best_weight = None
-    best_model = None
 
     for params in param_grid:
         model = HistGradientBoostingRegressor(
@@ -269,13 +268,14 @@ def train_candidate_a(
             }
             search_rows.append(row)
 
-            if m.mae < best_mae:
-                best_mae = m.mae
-                best_params = params
-                best_weight = w
-                best_model = model
-
     search_df = pd.DataFrame(search_rows).sort_values("val_mae").reset_index(drop=True)
+    best_params, best_weight = select_config_deterministic(search_df)
+    # Refit the selected tree (deterministic given the fixed seed) so the
+    # returned model matches the selected hyperparameters exactly.
+    best_model = HistGradientBoostingRegressor(
+        random_state=RANDOM_SEED, early_stopping=False, **best_params
+    )
+    best_model.fit(X_train, y_train)
 
     # Build the frozen CandidateA with the best params + weight
     config = CandidateAConfig(
@@ -303,3 +303,129 @@ def train_candidate_a(
     )
 
     return candidate, search_df
+
+
+# ---------------------------------------------------------------------------
+# Deterministic selection + frozen-config loading (reproducibility)
+# ---------------------------------------------------------------------------
+# The top hyperparameter candidates are separated by < 0.01 pp validation MAE,
+# so a plain argmin is not stable across scikit-learn versions (HistGradientBoosting
+# binning changed at 1.6, reordering near-ties). Two mechanisms make scoring
+# reproducible:
+#   1. select_config_deterministic() turns the search into a stable choice:
+#      within a tolerance of the best, prefer the SIMPLER model.
+#   2. The chosen config is frozen to reports/candidate_a_config.json and loaded
+#      by build_frozen_candidate(); holdout scoring and the dashboard fit that
+#      frozen config instead of re-running the search.
+
+FROZEN_CONFIG_PATH = REPORTS_DIR / "candidate_a_config.json"
+
+# A candidate "ties" with the best if its validation MAE is within this many
+# percentage points of the lowest. Among ties we prefer the simpler model.
+SELECTION_TOLERANCE_PP = 0.05
+
+
+def select_config_deterministic(
+    search_df: pd.DataFrame, tolerance_pp: float = SELECTION_TOLERANCE_PP
+) -> tuple[dict, float]:
+    """Pick (tree params, ensemble weight) deterministically from a search.
+
+    Among all candidates whose validation MAE is within ``tolerance_pp`` of the
+    best, choose the SIMPLEST model by an explicit, documented ordering:
+    shallower tree, fewer boosting iterations, larger min_samples_leaf, stronger
+    L2, lower learning rate, then a lower tree weight (more persistence). Ties on
+    all of those fall back to validation MAE. This is a total order, so the
+    result does not depend on row order or floating-point argmin jitter.
+    """
+    best = float(search_df["val_mae"].min())
+    near = [r for r in search_df.to_dict("records") if r["val_mae"] <= best + tolerance_pp]
+
+    def simplicity_key(r: dict) -> tuple:
+        p = r["params"]
+        return (
+            p["max_depth"],
+            p["max_iter"],
+            -p["min_samples_leaf"],
+            -p["l2_regularization"],
+            p["learning_rate"],
+            r["ensemble_weight_ca"],
+            r["val_mae"],
+        )
+
+    chosen = min(near, key=simplicity_key)
+    return dict(chosen["params"]), float(chosen["ensemble_weight_ca"])
+
+
+def load_frozen_config(path: Path | None = None) -> CandidateAConfig:
+    """Load the frozen Candidate A configuration from JSON (the single source of
+    truth). Holdout scoring and the dashboard use this, never a fresh search."""
+    if path is None:
+        path = FROZEN_CONFIG_PATH
+    payload = json.loads(Path(path).read_text())
+    c = payload["config"]
+    return CandidateAConfig(
+        max_depth=c["max_depth"],
+        learning_rate=c["learning_rate"],
+        max_iter=c["max_iter"],
+        l2_regularization=c["l2_regularization"],
+        min_samples_leaf=c["min_samples_leaf"],
+        ensemble_weight_ca=c["ensemble_weight_ca"],
+        feature_builder_params={k: tuple(v) for k, v in c["feature_builder_params"].items()},
+        random_seed=c["random_seed"],
+        train_window=tuple(c["train_window"]),
+        validation_window=tuple(c["validation_window"]),
+    )
+
+
+def fit_candidate_from_config(
+    config: CandidateAConfig,
+    split: Split | None = None,
+    feature_builder: features_mod.FeatureBuilder | None = None,
+) -> CandidateA:
+    """Fit Candidate A from an explicit frozen config, with NO hyperparameter
+    search. Deterministic given the pinned scikit-learn, the seed, and the data.
+    This is the reproducible scoring path used by the holdout pipeline and app."""
+    if split is None:
+        split = build_temporal_split()
+    if feature_builder is None:
+        feature_builder = features_mod.FeatureBuilder(
+            compliance_lags=tuple(config.feature_builder_params["compliance_lags"]),
+            compliance_roll_windows=tuple(config.feature_builder_params["compliance_roll_windows"]),
+            attendance_lags=tuple(config.feature_builder_params["attendance_lags"]),
+        )
+    ff = feature_builder.build()
+    f_cols = feature_builder.feature_columns()
+
+    train_lo, train_hi = split.windows["train"]
+    val_lo, val_hi = split.windows["validation"]
+    train_ff = _restrict_to_target_window(ff, train_lo, train_hi)
+    val_ff = _restrict_to_target_window(ff, val_lo, val_hi)
+
+    model = HistGradientBoostingRegressor(
+        random_state=config.random_seed,
+        early_stopping=False,
+        max_depth=config.max_depth,
+        learning_rate=config.learning_rate,
+        max_iter=config.max_iter,
+        l2_regularization=config.l2_regularization,
+        min_samples_leaf=config.min_samples_leaf,
+    )
+    model.fit(train_ff[f_cols].to_numpy(), train_ff["target_compliance"].to_numpy())
+
+    candidate = CandidateA(
+        config=config,
+        model=model,
+        feature_columns=f_cols,
+        val_metrics={},
+        fit_row_count=len(train_ff),
+    )
+    val_pred = val_ff.copy()
+    val_pred["prediction"] = candidate.predict(val_ff)
+    candidate.val_metrics = evaluate(val_pred).as_dict()
+    return candidate
+
+
+def build_frozen_candidate(path: Path | None = None, split: Split | None = None) -> CandidateA:
+    """Load the frozen config and fit it. The canonical way to obtain the scored
+    model for the holdout pipeline and the dashboard (no search at runtime)."""
+    return fit_candidate_from_config(load_frozen_config(path), split=split)

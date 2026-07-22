@@ -159,7 +159,7 @@ def page_overview():
             - **Point-estimate improvement:** Candidate A beats persistence by **+{improvement:.2f} pp**
               on the holdout (wins {payload["by_month"] and sum(1 for r in payload["by_month"] if r["mae_ca"] < r["mae_pers"])}/12 months).
             - **Statistical significance:** the paired-bootstrap 95% CI on the improvement is
-              **[−0.007, +0.302]** — it **includes zero**. We cannot rule out that the two are
+              **[{payload["improvement_95ci_pp"][0]:+.3f}, {payload["improvement_95ci_pp"][1]:+.3f}]** — it **includes zero**. We cannot rule out that the two are
               indistinguishable on a 12-month window.
             - **Structural break:** Scotland A&E compliance has fallen from ~97% (2007) to ~67% (2026)
               and is still declining. The model is evaluated on its ability to forecast *through* this

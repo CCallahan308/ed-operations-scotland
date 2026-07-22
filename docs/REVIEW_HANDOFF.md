@@ -10,7 +10,7 @@
 
 ## 1. The one-paragraph summary
 
-We built a 1-month-ahead site-level forecast of NHS Scotland A&E 4-hour compliance %, on real Public Health Scotland open data (7,022 Type-1 site-months, 2007-07 → 2026-05). The deliverable model is a gradient-boosted-tree + persistence ensemble. On a frozen, never-touched 12-month holdout (2025-06 → 2026-05) it achieves **MAE 2.72 pp** vs the persistence baseline's 2.87 pp — a **+0.15 pp point-estimate improvement, but the paired-bootstrap 95% CI on the improvement [−0.007, +0.302] includes zero**, so the improvement is directionally favorable but not statistically distinguishable from the baseline at this sample size. The dominant error source is a structural break: Scotland A&E compliance has fallen monotonically from ~97% (2007) to ~67% (2026) and is still declining; the model is evaluated on its ability to forecast *through* this regime change, which is the honest problem but also a hard one.
+We built a 1-month-ahead site-level forecast of NHS Scotland A&E 4-hour compliance %, on real Public Health Scotland open data (7,022 Type-1 site-months, 2007-07 → 2026-05). The deliverable model is a gradient-boosted-tree + persistence ensemble. On a frozen, never-touched 12-month holdout (2025-06 → 2026-05) it achieves **MAE 2.72 pp** vs the persistence baseline's 2.87 pp — a **+0.15 pp point-estimate improvement, but the paired-bootstrap 95% CI on the improvement [−0.006, +0.299] includes zero**, so the improvement is directionally favorable but not statistically distinguishable from the baseline at this sample size. The dominant error source is a structural break: Scotland A&E compliance has fallen monotonically from ~97% (2007) to ~67% (2026) and is still declining; the model is evaluated on its ability to forecast *through* this regime change, which is the honest problem but also a hard one.
 
 ---
 
@@ -64,23 +64,23 @@ These are the load-bearing decisions and findings we most want scrutinized. Each
 ### 4.2 Experimental design
 - **Split:** chronological, all sites in every partition (D014). train 2018-01..2023-12 (2,160 rows), validation 2024-01..2025-05 (510), holdout 2025-06..2026-05 (360). Pre-2018 history (3,992 rows) held aside as `pre_split`.
 - **Leakage controls (L1–L7):** no target column or its count-components in features (L1); all lags ≤ month t, rolling windows exclude current month via `shift(1)` (L2); chronological split with no key overlap (L3); no learned state in the feature pipeline (L4 satisfied trivially); holdout scored exactly once (L5); external enrichment not used (L6 n/a); disaggregated series not used (L7 n/a).
-- **Each leakage control has an invariant test.** 88 tests total, all green.
+- **Each leakage control has an invariant test.** 92 tests total, all green.
 
 ### 4.3 Model
 - **Family:** `HistGradientBoostingRegressor` (sklearn) blended with persistence: `pred = 0.4 × tree + 0.6 × prior_compliance`, clipped to [0, 100].
-- **Selection:** joint search over 5 tree hyperparameter sets × 3 ensemble weights on validation only. Selected: `max_depth=5, learning_rate=0.03, max_iter=500, l2_reg=1.0, min_samples_leaf=40, weight=0.4`. Top-5 candidates span MAE 2.509–2.526 (robust, not knife-edge).
-- **Features (21):** compliance lags (1,2,3,6,11,12); rolling mean/std (3,6,12); attendance lags (1,2,12); YoY attendance; calendar (year, month, quarter); months-since-site-start; 3-month momentum slope. All leak-free (L1/L1b guards PASS). Permutation importance shows `f_compliance_lag1` dominates (7.64 ΔMAE) — the model leans on persistence, which is why the ensemble formalizes that relationship.
+- **Selection:** joint search over 5 tree hyperparameter sets × 3 ensemble weights on validation only. Selected: `max_depth=5, learning_rate=0.03, max_iter=500, l2_reg=1.0, min_samples_leaf=40, weight=0.4`. The top candidates cluster within ~0.01 pp of each other, so the ranking among them is not stable across scikit-learn versions; the selected config is frozen to `reports/candidate_a_config.json` and loaded for all scoring rather than re-derived at runtime.
+- **Features (21):** compliance lags (1,2,3,6,11,12); rolling mean/std (3,6,12); attendance lags (1,2,12); YoY attendance; calendar (year, month, quarter); months-since-site-start; 3-month momentum slope. All leak-free (L1/L1b guards PASS). Permutation importance shows `f_compliance_lag1` dominates (7.47 ΔMAE) — the model leans on persistence, which is why the ensemble formalizes that relationship.
 
 ### 4.4 Evaluation
 - **Primary metric:** MAE in percentage points.
-- **Validation:** Candidate A MAE 2.509 vs persistence 2.848 (+0.339 pp, 11.9% relative).
-- **Holdout (scored once):** Candidate A MAE **2.7226** [bootstrap 95% CI 2.488, 2.941] vs persistence **2.870** (+0.147 pp).
-- **Paired bootstrap (10,000 resamples of per-row persistence − CandidateA abs-error difference):** mean +0.147 pp, **95% CI [−0.007, +0.302] — includes zero.**
+- **Validation:** Candidate A MAE 2.519 vs persistence 2.848 (+0.329 pp, 11.5% relative).
+- **Holdout (scored once):** Candidate A MAE **2.7231** [bootstrap 95% CI 2.505, 2.948] vs persistence **2.870** (+0.147 pp).
+- **Paired bootstrap (10,000 resamples of per-row persistence − CandidateA abs-error difference):** mean +0.147 pp, **95% CI [−0.006, +0.299] — includes zero.**
 
 ### 4.5 Robustness checks performed
-1. **Seed stability** — 5 seeds → identical MAE 2.509 (HGBR is effectively deterministic here). Not a lucky draw.
+1. **Seed stability** — 5 seeds → identical MAE 2.519 (HGBR is effectively deterministic here). Not a lucky draw.
 2. **COVID-exclusion sensitivity** — retraining without 2020-03..2022-12 changes validation MAE by +0.015 pp. Including COVID is harmless and honest.
-3. **Feature ablation** — 2-feature model (lag1 + roll3) gets 2.715; the full 21-feature set earns its complexity (+0.21 pp).
+3. **Feature ablation** — 2-feature model (lag1 + roll3) gets 2.715; the full 21-feature set earns its complexity (+0.20 pp).
 4. **Per-site equity** — ensemble wins on 28/30 validation sites; improvement is uniform across attendance quintiles.
 
 ---
@@ -103,7 +103,7 @@ A reviewer who finds any of these claimed anywhere in the project should flag it
 ```bash
 cd ed-operations-scotland
 pip install -r requirements.txt
-python -m pytest tests/ -v          # 88 tests; every leakage invariant is here
+python -m pytest tests/ -v          # 92 tests; every leakage invariant is here
 PYTHONPATH=src python pipeline/score_holdout.py   # re-scores the holdout (a reused evaluation if run again)
 ```
 
@@ -111,7 +111,7 @@ PYTHONPATH=src python pipeline/score_holdout.py   # re-scores the holdout (a reu
 - Raw data SHA-256 matches `src/ed_ops/config.py::SOURCE_PROVENANCE` → confirms the data hasn't been touched.
 - `build_primary_panel()` rebuilds the 7,022-row panel from raw, deterministically.
 - `build_temporal_split()` rebuilds the train/val/holdout partitions with seed 20260721.
-- `train_candidate_a()` reproduces val MAE 2.5091 exactly (5-seed stability).
+- `build_frozen_candidate()` reproduces val MAE 2.5192 exactly under the pinned scikit-learn range; the frozen config is loaded, not re-selected.
 - `reports/candidate_a_config.json` is the frozen config; `reports/holdout_evaluation.json` is the one-pass holdout result.
 
 **Specific things a reviewer can challenge:**
@@ -148,9 +148,9 @@ We propose the review board judge the project against these criteria. We do not 
 | Honest baseline the model must beat | ✅ Met | Persistence at MAE 2.85 (D016); reframed from seasonal naive on evidence |
 | Leakage-safe methodology | ✅ Met | L1–L7 controls, 88 invariant tests, holdout scored once |
 | Honest reporting of a non-ideal result | ✅ Met | Non-significant holdout CI reported without hedging (D021) |
-| Reproducible end-to-end | ✅ Met | Deterministic rebuild from raw; pinned deps; 88 tests |
+| Reproducible end-to-end | ✅ Met | Deterministic rebuild from raw; pinned deps; 92 tests |
 | Decision-ready output | ⚠️ Partial | Forecasts interpretable; but improvement not significant and sharp drops missed |
-| Statistically significant improvement over baseline | ❌ Not met | CI [−0.007, +0.302] includes zero on 12-month holdout |
+| Statistically significant improvement over baseline | ❌ Not met | CI [−0.006, +0.299] includes zero on 12-month holdout |
 | Causal / intervention insight | ❌ Out of scope (by design) | Explicitly disclaimed; aggregate data cannot support causal claims |
 
 ---

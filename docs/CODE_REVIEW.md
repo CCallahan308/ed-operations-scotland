@@ -4,7 +4,7 @@
 
 ## Summary
 
-The project is methodologically sound and the test suite (85 tests) is genuinely catching real bugs — three were caught and fixed during development (target-column bug, seasonal-naive lag bug, manifest coverage bug). The leakage discipline is the strongest part: every phase has invariant tests, and the holdout was scored exactly once with the frozen config verified.
+The project is methodologically sound and the test suite (92 tests) is genuinely catching real bugs — three were caught and fixed during development (target-column bug, seasonal-naive lag bug, manifest coverage bug). The leakage discipline is the strongest part: every phase has invariant tests, and the holdout was scored exactly once with the frozen config verified.
 
 Five findings, ordered by severity. **One real bug (latent, not currently triggered), two quality issues worth fixing, two informational notes.** No critical security or data-integrity defects.
 
@@ -66,7 +66,7 @@ bad_mask = (
 ### I1 — `evaluate()` `direction_tolerance_pp` default is undocumented in the metrics output
 **Location:** `src/ed_ops/evaluation.py:73, 110-120`
 
-The 0.5pp tolerance for "no change" in directional accuracy is reasonable, but it's a hidden parameter that affects the reported `directional_accuracy` metric. A reader comparing this project's `dir_acc=48.6%` to another model's `dir_acc` at tolerance=0 would be misled.
+The 0.5pp tolerance for "no change" in directional accuracy is reasonable, but it's a hidden parameter that affects the reported `directional_accuracy` metric. A reader comparing this project's `dir_acc=48.1%` to another model's `dir_acc` at tolerance=0 would be misled.
 
 **Fix (minor):** Record `direction_tolerance_pp` in `Metrics` (or at least note it in the metric's docstring shown in reports). Not a bug; a transparency improvement.
 
