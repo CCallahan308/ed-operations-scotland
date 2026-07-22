@@ -12,6 +12,8 @@
 
 The ensemble weight (0.4) and tree hyperparameters were selected **jointly** on validation. The holdout was never used.
 
+**On the name "Candidate A".** It was the working name for the deliverable model, selected against documented alternatives: the tree alone (rejected in D018 - it loses to persistence), the ensemble at other blend weights (evaluated below), and the three baselines. It is the one candidate that survived selection, not one of several models shipped in parallel.
+
 ## Two honest findings that reshaped the model
 
 ### Finding 1: the tree alone loses to persistence (D018)

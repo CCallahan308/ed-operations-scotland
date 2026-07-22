@@ -2,7 +2,7 @@
 
 > Forecast next-month site-level 4-hour compliance % across NHS Scotland A&E departments, to help operations teams target capacity support proactively.
 >
-> **Status:** Phases 0–7 complete. 92 tests green. Holdout evaluated once.
+> **Status:** Phases 0–7 complete, plus a post-audit hardening pass. 111 tests (37 run on the committed fixture; the rest need the dataset). Holdout evaluated once.
 
 ## Headline result (honest)
 
@@ -22,6 +22,14 @@ A portfolio flagship blending Business Intelligence, Business Analytics, and Dat
 
 The recurring decision: *each month, NHS board operations must decide where to focus capacity support for the next month.* This project forecasts site-level compliance to make that decision proactive rather than reactive.
 
+## What this demonstrates
+
+- **Leakage-safe time-series ML** - chronological split, as-of features, a holdout scored once, and a frozen config that is loaded (not re-searched), so the result reproduces across machines.
+- **Honest evaluation** - three baselines, bootstrap confidence intervals, and a reported null-leaning result: the improvement's 95% CI includes zero, and that is stated plainly.
+- **Analytics engineering / SQL** - a DuckDB star-schema layer (fact + dimensions + count-ratio aggregations) reconciled to the Python pipeline row-for-row ([`docs/BI_DATA_MODEL.md`](docs/BI_DATA_MODEL.md)).
+- **BI / dashboarding** - a deploy-ready Streamlit app rendered from committed artifacts, with honest KPI framing.
+- **Engineering discipline** - pinned dependencies, CI, 111 tests, and a committed fixture so the suite runs without the dataset.
+
 ## Data provenance
 
 - Source: [Monthly A&E Activity and Waiting Times — Public Health Scotland](https://www.opendata.nhs.scot/dataset/monthly-accident-and-emergency-activity-and-waiting-times)
@@ -33,17 +41,21 @@ The recurring decision: *each month, NHS board operations must decide where to f
 
 ```
 ed-operations-scotland/
-├── app.py            # Streamlit dashboard (5 pages, scoped to real artifacts)
+├── app.py              # Streamlit dashboard (thin view over committed artifacts)
+├── .github/workflows/  # ci.yml (ruff + pytest on push/PR, Python 3.11/3.12)
+├── .streamlit/         # theme config for deployment
 ├── data/
-│   ├── raw/         # immutable PHS exports (5 CSVs; gitignored)
-│   ├── external/    # reserved for holidays/weather (not used in v1)
-│   └── processed/   # primary_panel_type1.parquet, split_manifest.csv
-├── docs/            # 7 phase deliverables + execution plan + review handoff
-├── pipeline/        # score_holdout.py (one-shot Phase 6 scoring)
-├── reports/         # configs, metrics, figures (incl. dashboard screenshots)
-├── sql/             # reserved (v2 BI layer)
-├── src/ed_ops/      # config, data_quality, splits, baselines, features, model, evaluation
-└── tests/           # 92 tests across 6 modules
+│   ├── raw/            # PHS exports (gitignored; fetch via scripts/fetch_data.py)
+│   ├── external/       # reserved for holidays/weather (not used in v1)
+│   └── processed/      # rebuilt artifacts (gitignored; reproducible)
+├── docs/               # phase deliverables, BI data model, review handoff, execution log
+├── notebooks/          # 01_data_exploration.ipynb (reproducible EDA)
+├── pipeline/           # score_holdout.py (one-shot holdout scoring)
+├── reports/            # frozen config, metrics, feature importance, dashboard_data.json
+├── scripts/            # fetch_data.py, run_sql.py, build_dashboard_data.py
+├── sql/                # DuckDB analytics layer (fact + dims + aggregations + validations)
+├── src/ed_ops/         # config, data_quality, splits, baselines, features, model, evaluation, dashboard_data
+└── tests/              # 111 tests across 10 modules (fixture-runnable; full-data tests skip)
 ```
 
 ## Dashboard
@@ -150,8 +162,8 @@ _A hosted demo link will be added here once deployed._
 
 This project follows the standard of a senior analytics professional:
 
-- **Leakage audit at every phase** — 92 tests enforce raw-data integrity, count identities, no-target-in-features (L1), all-lags-≤-t (L2), chronological split (L3), and no-holdout-in-training (L5).
-- **Honest baselines** — three baselines including seasonal naive; the actual bar turned out to be persistence (MAE 2.85 pp), not seasonal naive as originally framed.
+- **Leakage audit at every phase** — 111 tests enforce raw-data integrity, count identities, no-target-in-features (L1), all-lags-≤-t (L2), chronological split (L3), and no-holdout-in-training (L5).
+- **Honest baselines** — three baselines including seasonal naive; the actual bar turned out to be persistence (validation MAE 2.85 pp; 2.87 pp on the holdout), not seasonal naive as originally framed.
 - **Honest reporting of a negative-leaning result** — when Candidate A's tree alone lost to persistence (Phase 5), it was reported, not tuned away. When the holdout improvement failed to reach statistical significance (Phase 6), the CI was reported, not hidden.
 - **Documented structural break** — NHS Scotland A&E compliance fell from ~97% (2007) to ~67% (2026) and is still declining. The model is evaluated on its ability to forecast *through* this regime change, which is the honest problem.
 
@@ -160,7 +172,7 @@ This project follows the standard of a senior analytics professional:
 | Doc | Purpose |
 |---|---|
 | [`docs/REVIEW_HANDOFF.md`](docs/REVIEW_HANDOFF.md) | **Review board handoff** — what to challenge, what's defensible, success criteria. *Start here for external review.* |
-| [`docs/candidate_a_hong_kong_execution_plan.md`](docs/candidate_a_hong_kong_execution_plan.md) | Authoritative execution record (Phases 0–7, decisions D001–D021) |
+| [`docs/EXECUTION_LOG.md`](docs/EXECUTION_LOG.md) | Authoritative execution record (Phases 0–7, decisions D001–D021) |
 | [`docs/PROBLEM_FRAMING.md`](docs/PROBLEM_FRAMING.md) | Phase 1: decision, target, metrics, leakage surface, non-claims |
 | [`docs/DATA_QUALITY.md`](docs/DATA_QUALITY.md) | Phase 2: findings F001–F005, cleaning rules |
 | [`docs/SPLIT_DESIGN.md`](docs/SPLIT_DESIGN.md) | Phase 3: structural-break analysis, leakage controls |

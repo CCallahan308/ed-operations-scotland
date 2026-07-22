@@ -1,6 +1,6 @@
 # Candidate A Execution Plan (NHS Scotland A&E)
 
-> **Pivot note (2026-07-21):** This project began as "Candidate A, Hong Kong Data." Phase 0 audit found the Hong Kong HA dataset was a 3-field near-real-time snapshot feed that could not support the original patient-level breach-prediction design. After D004 flagged the scope gap, the operator chose to pivot to NHS Scotland Monthly A&E Activity and Waiting Times. The plan filename is retained for traceability; all content below reflects the Scotland path. Earlier D001-D004 entries are kept as the honest history of the pivot.
+> **Pivot note (2026-07-21):** This project began as "Candidate A, Hong Kong Data." Phase 0 audit found the Hong Kong HA dataset was a 3-field near-real-time snapshot feed that could not support the original patient-level breach-prediction design. After D004 flagged the scope gap, the operator chose to pivot to NHS Scotland Monthly A&E Activity and Waiting Times. The plan was renamed from candidate_a_hong_kong_execution_plan.md to EXECUTION_LOG.md (2026-07-22, post-audit) for domain clarity, with all references updated; all content below reflects the Scotland path. Earlier D001-D004 entries are kept as the honest history of the pivot.
 
 ## Project identity
 - Candidate: A
@@ -16,7 +16,7 @@
 - Unit of analysis: one row = one (TreatmentLocation × Month × DepartmentType × AttendanceCategory). Will be reduced to one row per (site × month) for the primary modeling panel in Phase 1.
 - Time period: 2007-07 → 2026-05 (227 months; ~19 years).
 - Geographic scope: Scotland (103 treatment locations across NHS boards).
-- Execution status: **COMPLETE** — Phases 0-7 all passed. 92 tests green. Holdout scored once.
+- Execution status: **COMPLETE** — Phases 0-7 all passed. 111 tests green (37 fixture-only in CI). Holdout scored once.
 
 ## Decision log
 | ID | Decision | Rationale | Evidence or test | Alternatives considered | Date |
@@ -26,7 +26,7 @@
 | D003 | Did NOT initialize a data-validation module or feature pipeline at Phase 0 | Modeling target and required validations are undetermined until Phase 1; writing validation now would be fabricated scaffolding | Operating rule: "Do not create empty scaffolding merely to satisfy this list" | pre-write Great-Expectations suite (rejected: would assert on an unverified schema) | 2026-07-21 |
 | D004 | Flagged HK scope divergence as a Phase 1 gate rather than proceeding with the original patient-level "4-hour breach" framing | Official HA data spec confirms only `hospName`, `topWait`, `updateTime` (15-min snapshot). No patient-level fields exist. Proceeding would require fabricating a target | Official HK HA data spec PDF read 2026-07-21 | proceed with proxy target (rejected: violates "do not fabricate" and changes the scientific question) | 2026-07-21 |
 | D005 | **Pivot from Hong Kong HA to NHS Scotland Monthly A&E Activity and Waiting Times.** Rename working dir to `ed-operations-scotland`. | Operator selected the "pivot to NHS Scotland" option from the D004 gate. NHS source provides rich site-month grain (4h/8h/12h breach counts & percentages, attendance categories, dept types) back to 2007, sufficient for BI + business analytics + forecasting. Schema verified by downloading the real CSV and reading its header. | Real CSV downloaded 2026-07-21: 39,583 rows, 227 months, 103 sites, 26 columns including breach statistics. SHA-256 recorded in DATA_SOURCE.md. | (i) forecast next-reading HK topWait bucket — rejected: weak decision hook and requires self-polling for any history; (ii) self-collect HK time series over weeks — rejected: extends timeline; (iv) search for richer HK source — rejected: no machine-readable patient-level HK source identified. | 2026-07-21 |
-| D006 | Plan filename (`candidate_a_hong_kong_execution_plan.md`) intentionally retained post-pivot | Preserves traceability through the pivot; this header note documents the rename | - | rename file (rejected: breaks links from README/DATA_SOURCE and loses audit trail) | 2026-07-21 |
+| D006 | Execution log **renamed** `candidate_a_hong_kong_execution_plan.md` -> `EXECUTION_LOG.md` (2026-07-22, post-audit) | The `hong_kong` filename was confusing in an NHS Scotland repo; all references were updated (README, DATA_SOURCE, config.py, REVIEW_HANDOFF). Supersedes the earlier decision to retain the name. | - | keep original name (rejected: confuses reviewers) | 2026-07-22 |
 | D007 | **Primary modeling target: next-month site-level 4-hour compliance %** (regression) | Operator-selected. Most policy-aligned (NHS Scotland is held accountable on % seen within 4h); clean regression framing; supports a real weekly decision (which sites need capacity support next month). Honest baseline: per-site seasonal naive + same-month-last-year | breach volume regression (rejected: dominated by attendance volume, less policy-aligned); compliance classifier (rejected: discards information, threshold is an extra Choice); draft-options-doc-first (rejected: target is clear enough to lock) | 2026-07-21 |
 | D008 | Pull all four companion resources (demographics, when, referral, multiple attendances) now | Operator-selected. Enables stronger BA layer (who comes, when, via what route) and richer dashboard. Accepted cost: ~4 more CSVs to validate in Phase 2, narrower coverage window (companion files start 2018-01) | main file only (rejected: weaker BA/dashboard); demographics+when only (rejected: referral source is a strong driver signal, worth the extra validation) | 2026-07-21 |
 | D009 | `multiple_attendances` is recorded as **descriptive-only**, not a modeling feature | Real CSV header is `YearEnd`-keyed (annual grain), not `Month`. Cannot be joined to the monthly modeling panel without fabrication. Will be used in the BA writeup as a repeat-attender descriptor | force a monthly interpolation (rejected: fabrication) | 2026-07-21 |
@@ -79,7 +79,7 @@
 | 31 | Wrote 12 holdout tests pinning the recorded result + the honest CI finding | `python -m pytest tests/test_holdout.py -v` | 12/12 pass. Tests pin headline metrics AND assert the artifact records limitations honestly (so a future edit can't silently upgrade a non-significant result to significant). | ✅ | tests/test_holdout.py |
 | 32 | Lint + format sweep | `ruff check` + `ruff format --check` | Initial: 29 lint errors + 13 files needing reformat. Fixed via auto-fix (26) + 3 manual fixes. Final: 0 errors, 16 files formatted. | ✅ | docs/HANDOFF_PHASE7.md |
 | 33 | Requirements.txt audit (declared vs actual imports) | AST scan of third-party imports | Found gap: code imports sklearn + matplotlib but neither declared; black listed but unused. Fixed requirements.txt to match reality (added scikit-learn, matplotlib; removed black). | ✅ | requirements.txt |
-| 34 | Doc-claim consistency audit (every quantitative claim vs artifact) | inline verification script | All 12 checked claims match: SHA, panel shape, medians, val MAE 2.5192, holdout MAE 2.7231, CI [2.505,2.948], improvement 0.147pp, 92 tests. | ✅ | docs/HANDOFF_PHASE7.md |
+| 34 | Doc-claim consistency audit (every quantitative claim vs artifact) | inline verification script | All 12 checked claims match: SHA, panel shape, medians, val MAE 2.5192, holdout MAE 2.7231, CI [2.505,2.948], improvement 0.147pp, 111 tests. | ✅ | docs/HANDOFF_PHASE7.md |
 | 35 | README rewrite (was Phase 0 version) | manual | Rewrote to reflect finished project: honest headline with CI, layout, reproduction, discipline section, 7 doc links, limitations. | ✅ | README.md |
 | 36 | Final reproducibility sweep (6 checks) | tests + lint + format + panel rebuild + split rebuild + config integrity | All 6 pass. Panel 7022 rows / 35 sites; split seed 20260721 train2160/val510/holdout360; frozen config exact match. | ✅ | docs/HANDOFF_PHASE7.md |
 
@@ -140,7 +140,7 @@
 - [x] Gate passed — qualified positive reported honestly (D021); improvement is point-estimate real but not statistically significant on 12-month holdout
 
 ### Phase 7, Reproducibility and handoff
-- [x] Tests pass — 85/85 across 6 modules
+- [x] Tests pass — 111 across 10 modules (37 fixture-only in CI)
 - [x] Lint, type, format, and build checks run where configured — ruff check 0 errors, ruff format 17/17 clean (initial run found 29 lint errors + 13 format issues; all fixed)
 - [x] Clean-environment run attempted or documented — requirements.txt audited and corrected (sklearn/matplotlib were missing; black was unused); 6-check reproducibility sweep all pass
 - [x] Artifacts and run instructions verified — panel/split/config all rebuild deterministically from raw; reproduction entrypoint documented in README
@@ -194,7 +194,7 @@
 - Final model result (the headline):
   - **Validation**: Candidate A (ensemble) MAE 2.519 pp vs persistence bar 2.848 pp → +0.329 pp (11.5% relative).
   - **Holdout**: Candidate A MAE 2.723 pp [95% CI 2.505-2.948] vs persistence 2.870 pp → +0.147 pp (5.1% relative). **Paired-bootstrap 95% CI on improvement [-0.006, +0.299] includes zero — not statistically significant on 12-month holdout.** Reported without hedging (D021).
-- Verification (Phase 7): 92/92 tests green; ruff lint 0 errors; ruff format 17/17 clean; 12 quantitative doc claims verified against artifacts; panel/split/model all rebuild deterministically from raw.
+- Verification (post-audit): 111/111 tests green (37 fixture-only in CI); ruff lint 0 errors; ruff format clean; 12 quantitative doc claims verified against artifacts; panel/split/model all rebuild deterministically from raw.
 - Honest limitations (final):
   1. The structural break (train median 89.3 vs holdout median ~67) is the dominant error source; Candidate A's bias grew from +0.14 (val) to +0.66 (holdout) pp as the regime kept drifting.
   2. The model smooths; it does not predict sharp one-month drops (the worst errors are exactly those high-stakes months).
@@ -202,7 +202,7 @@
   4. Point forecasts only; no prediction intervals.
   5. Site-month aggregate; cannot inform individual patient triage.
   6. No causal claims — the model predicts; it does not estimate intervention effects.
-- Reproduction command: `pip install -r requirements.txt && python -m pytest tests/ -v` (92 tests); full pipeline `PYTHONPATH=src python pipeline/score_holdout.py`
+- Reproduction command: `pip install -r requirements.txt && python -m pytest tests/ -v` (111 tests; 37 fixture-only); full pipeline `PYTHONPATH=src python pipeline/score_holdout.py`
 - Last updated: 2026-07-21
 
 ## Execution sequence

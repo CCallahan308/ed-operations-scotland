@@ -21,7 +21,7 @@ These are the load-bearing decisions and findings we most want scrutinized. Each
 | # | Decision / finding | Why it deserves challenge | Where the evidence lives |
 |---|---|---|---|
 | **Q1** | **Target = next-month compliance % at site-month grain (D007).** | Aggregate site-month cannot inform patient-level triage or within-month surge response. Is the chosen grain actually the decision a board makes, or a constraint of the data? | `docs/PROBLEM_FRAMING.md` §Target, §Non-claims |
-| **Q2** | **Pivot from Hong Kong HA snapshot data to NHS Scotland (D005).** | The HK dataset was a 3-field real-time snapshot; the pivot was forced by data availability. Reviewers should confirm NHS Scotland is the right alternative, not just the available one. | `docs/candidate_a_hong_kong_execution_plan.md` D004–D005 |
+| **Q2** | **Pivot from Hong Kong HA snapshot data to NHS Scotland (D005).** | The HK dataset was a 3-field real-time snapshot; the pivot was forced by data availability. Reviewers should confirm NHS Scotland is the right alternative, not just the available one. | `docs/EXECUTION_LOG.md` D004–D005 |
 | **Q3** | **Train window 2018-01 → 2023-12 (D015).** | We deliberately trained on the recent regime rather than the full 2007+ history, because the pre-2020 regime (median ~95%) no longer exists. This discards 10 years of data. Is that the right tradeoff? | `docs/SPLIT_DESIGN.md` §Chosen windows |
 | **Q4** | **The bar is persistence (MAE 2.85), not seasonal naive (D016).** | PROBLEM_FRAMING.md anticipated seasonal naive as the bar; the evidence said otherwise because compliance is strongly autocorrelated and seasonal naive is biased high by the structural break. A reviewer may want to verify this reframing. | `docs/BASELINES_AND_FEATURES.md` §Finding 2 |
 | **Q5** | **Candidate A is an ensemble with persistence (D019), not the tree alone.** | The tree alone *lost* to persistence (MAE 3.10 vs 2.85). The ensemble (0.4 tree + 0.6 persistence) was selected on validation. A reviewer should ask: is this a genuine model or a slight perturbation of the baseline? | `docs/MODEL_PHASE5.md` §Two honest findings |
@@ -64,7 +64,7 @@ These are the load-bearing decisions and findings we most want scrutinized. Each
 ### 4.2 Experimental design
 - **Split:** chronological, all sites in every partition (D014). train 2018-01..2023-12 (2,160 rows), validation 2024-01..2025-05 (510), holdout 2025-06..2026-05 (360). Pre-2018 history (3,992 rows) held aside as `pre_split`.
 - **Leakage controls (L1–L7):** no target column or its count-components in features (L1); all lags ≤ month t, rolling windows exclude current month via `shift(1)` (L2); chronological split with no key overlap (L3); no learned state in the feature pipeline (L4 satisfied trivially); holdout scored exactly once (L5); external enrichment not used (L6 n/a); disaggregated series not used (L7 n/a).
-- **Each leakage control has an invariant test.** 92 tests total, all green.
+- **Each leakage control has an invariant test.** 111 tests total, all green.
 
 ### 4.3 Model
 - **Family:** `HistGradientBoostingRegressor` (sklearn) blended with persistence: `pred = 0.4 × tree + 0.6 × prior_compliance`, clipped to [0, 100].
@@ -103,7 +103,7 @@ A reviewer who finds any of these claimed anywhere in the project should flag it
 ```bash
 cd ed-operations-scotland
 pip install -r requirements.txt
-python -m pytest tests/ -v          # 92 tests; every leakage invariant is here
+python -m pytest tests/ -v          # 111 tests; every leakage invariant is here
 PYTHONPATH=src python pipeline/score_holdout.py   # re-scores the holdout (a reused evaluation if run again)
 ```
 
@@ -134,7 +134,7 @@ The review board should read these in this order; each is self-contained.
 | 5 | `docs/BASELINES_AND_FEATURES.md` | Why the bar is persistence, the two bug-fix findings. |
 | 6 | `docs/DATA_QUALITY.md` | The 5 cleaning findings; the count-identity ground truth. |
 | 7 | `docs/CODE_REVIEW.md` | The most recent internal review (2 warnings found and fixed). |
-| 8 | `docs/candidate_a_hong_kong_execution_plan.md` | The full execution record: 21 decisions (D001–D021), 36 validation-ledger entries. Read if you want the audit trail. |
+| 8 | `docs/EXECUTION_LOG.md` | The full execution record: 21 decisions (D001–D021), 36 validation-ledger entries. Read if you want the audit trail. |
 
 ---
 
@@ -148,7 +148,7 @@ We propose the review board judge the project against these criteria. We do not 
 | Honest baseline the model must beat | ✅ Met | Persistence at MAE 2.85 (D016); reframed from seasonal naive on evidence |
 | Leakage-safe methodology | ✅ Met | L1–L7 controls, 88 invariant tests, holdout scored once |
 | Honest reporting of a non-ideal result | ✅ Met | Non-significant holdout CI reported without hedging (D021) |
-| Reproducible end-to-end | ✅ Met | Deterministic rebuild from raw; pinned deps; 92 tests |
+| Reproducible end-to-end | ✅ Met | Deterministic rebuild from raw; pinned deps; 111 tests |
 | Decision-ready output | ⚠️ Partial | Forecasts interpretable; but improvement not significant and sharp drops missed |
 | Statistically significant improvement over baseline | ❌ Not met | CI [−0.006, +0.299] includes zero on 12-month holdout |
 | Causal / intervention insight | ❌ Out of scope (by design) | Explicitly disclaimed; aggregate data cannot support causal claims |

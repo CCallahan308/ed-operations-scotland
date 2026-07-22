@@ -3,8 +3,7 @@
 Schema and feature definitions are intentionally NOT encoded here yet.
 Those depend on the Phase 1 scope lock and Phase 3 split strategy, and
 will be added only after the plan is updated. See
-docs/candidate_a_hong_kong_execution_plan.md (the plan filename is
-retained for traceability through the HK->Scotland pivot; the project
+docs/EXECUTION_LOG.md (records the HK->Scotland pivot; the project
 itself is NHS Scotland A&E data).
 """
 

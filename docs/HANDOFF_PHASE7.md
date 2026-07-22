@@ -6,7 +6,7 @@
 
 | Check | Command | Result |
 |---|---|---|
-| Full test suite | `python -m pytest tests/ -v` | **92 passed** across 6 modules |
+| Full test suite | `python -m pytest tests/ -v` | **111 passed** across 10 modules (37 fixture-only in CI) |
 | Lint | `python -m ruff check src/ tests/ pipeline/` | All checks passed |
 | Format | `python -m ruff format --check src/ tests/ pipeline/` | 16 files already formatted |
 | Panel rebuilds from raw | `build_primary_panel()` | 7,022 rows, 35 sites (matches docs) |
@@ -35,7 +35,7 @@ Every quantitative claim in the docs was verified against the actual artifacts:
 | Holdout 95% CI [2.505, 2.948] | HOLDOUT_PHASE6.md | [2.5047, 2.9477] ✓ |
 | Holdout improvement +0.147 pp | HOLDOUT_PHASE6.md | 0.147 ✓ |
 | Persistence holdout MAE 2.870 | HOLDOUT_PHASE6.md | 2.87 ✓ |
-| 92 tests | README | ✓ |
+| 111 tests | README | ✓ |
 | 5 raw CSVs | DATA_SOURCE.md | ✓ |
 
 ## Unresolved issues
@@ -43,7 +43,7 @@ Every quantitative claim in the docs was verified against the actual artifacts:
 None at blocker level. The following are documented limitations, not defects:
 
 1. Holdout CI includes zero — a property of the data (12-month window, structural break), not a bug. Reported honestly in HOLDOUT_PHASE6.md.
-2. `sql/` and `notebooks/` directories are empty placeholders for the v2 BI/dashboard layer — not part of the Phase 0–7 scope.
+2. (Resolved in the post-audit pass) `sql/` now holds a runnable DuckDB analytics layer reconciled to the Python pipeline, and `notebooks/` holds a reproducible EDA notebook.
 3. The stale `ed-operations-hong-kong/` directory (from the pre-pivot scaffold) is locked by OneDrive sync and could not be removed; flagged for manual cleanup. It contains no Scotland data and is not referenced by any Scotland code.
 
 ## Reproducibility statement
@@ -62,7 +62,7 @@ Determinism is enforced by: fixed `RANDOM_SEED=20260721`, pinned dependency floo
 The project is complete to the bar defined in the operating rules. Final artifacts:
 
 - **Code:** `src/ed_ops/` (7 modules) + `pipeline/score_holdout.py`
-- **Tests:** `tests/` (6 modules, 92 tests, all green)
+- **Tests:** `tests/` (10 modules, 111 tests, all green)
 - **Docs:** `docs/` (7 phase deliverables + execution plan)
 - **Reports:** `reports/` (configs, metrics, feature importance, 2 figures)
 - **Data:** `data/raw/` (5 immutable PHS CSVs) + `data/processed/` (panel, manifest, summary)
