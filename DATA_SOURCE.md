@@ -82,3 +82,12 @@ Available on the same dataset page, not yet downloaded:
 | Multiple attendances | `0ca3b959-b758-4532-bb55-aa86da28679e` |
 
 Whether to pull these depends on Phase 1's feature decisions.
+
+
+## Data licence (code licence is MIT)
+
+The NHS Scotland A&E data used by this project is published by Public Health
+Scotland under the UK Open Government Licence (OGL) v3.0 and is subject to
+that licence, not the repository's MIT terms. The raw data is not
+redistributed in this repository (see `scripts/fetch_data.py`). Contains
+public sector information licensed under the Open Government Licence v3.0.

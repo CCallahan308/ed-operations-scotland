@@ -19,12 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Data: this license covers the CODE only. The NHS Scotland A&E data used by this
-project is published by Public Health Scotland under the UK Open Government
-Licence (OGL) v3.0 and is subject to that licence, not the MIT terms above. The
-raw data is not redistributed in this repository (see DATA_SOURCE.md and
-scripts/fetch_data.py). Contains public sector information licensed under the
-Open Government Licence v3.0.
